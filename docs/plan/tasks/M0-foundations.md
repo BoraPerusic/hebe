@@ -1199,3 +1199,28 @@ A `talos` binary stub with all v1 subcommands wired as no-ops, so contributors c
 ### References
 
 - `v1-specs.md` §2.11 (CLI subcommands)
+
+
+---
+
+## M0.T12 — `just` command runner
+
+**Status**: pending  
+**Size**: S  
+**Depends on**: M0.T1  
+**Blocks**: M1.* (every other task)
+
+### Goal
+
+Create a local `justfile` that will allow to run
+- build
+- test
+- deploy locally
+- tag a commit with a new (semantic) version
+etc.
+
+See the `justfile.sample` - a sample file from other (large) project
+
+### Files to create
+
+- `justfile`
