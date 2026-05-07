@@ -18,12 +18,14 @@ interface MemoryStore {
         query: String,
         k: Int = 10,
         scope: MemoryScope = MemoryScope.Default,
+        categories: Set<MemoryCategory>? = null,
     ): List<MemoryHit>
 
     suspend fun appendDoc(
         path: String,
         content: String,
         scope: MemoryScope = MemoryScope.Default,
+        category: MemoryCategory = MemoryCategory.Document,
     )
 
     suspend fun readDoc(path: String): String?
@@ -73,6 +75,15 @@ enum class MemoryScope {
     Default,
     Identity,
     Daily,
+}
+
+@Serializable
+enum class MemoryCategory {
+    Conversation,
+    Fact,
+    Preference,
+    Skill,
+    Document,
 }
 
 data class MemorySnapshot(

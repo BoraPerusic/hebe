@@ -30,6 +30,7 @@ logstashEncoder     = "8.1"
 
 [libraries]
 kotlinx-coroutines-core   = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",   version.ref = "coroutines" }
+kotlinx-coroutines-test   = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test",     version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 kotlinx-datetime          = { module = "org.jetbrains.kotlinx:kotlinx-datetime",            version.ref = "datetime" }
 koog-core                 = { module = "ai.koog:koog-core",                                version.ref = "koog" }
@@ -59,6 +60,8 @@ otel-api                  = { module = "io.opentelemetry:opentelemetry-api",    
 junit-jupiter             = { module = "org.junit.jupiter:junit-jupiter",                   version.ref = "junit" }
 junit-platform-launcher   = { module = "org.junit.platform:junit-platform-launcher" }
 kotest-assertions         = { module = "io.kotest:kotest-assertions-core",                  version.ref = "kotest" }
+kotest-framework-engine   = { module = "io.kotest:kotest-framework-engine",              version.ref = "kotest" }
+kotest-junit-platform     = { module = "io.kotest:kotest-junit-platform",                 version.ref = "kotest" }
 mockk                     = { module = "io.mockk:mockk",                                    version.ref = "mockk" }
 testcontainers             = { module = "org.testcontainers:testcontainers",                  version.ref = "testcontainers" }
 clikt                     = { module = "com.github.ajalt.clikt:clikt",                      version.ref = "clikt" }

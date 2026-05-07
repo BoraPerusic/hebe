@@ -69,4 +69,11 @@ sealed class ObserverEvent {
         val turnId: String,
         val approved: Boolean,
     ) : ObserverEvent()
+
+    @Serializable
+    @SerialName("memory_db_ready")
+    data class MemoryDbReady(
+        val version: String?,
+        val applied: Int,
+    ) : ObserverEvent()
 }
