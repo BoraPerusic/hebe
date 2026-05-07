@@ -218,31 +218,31 @@ Populate the version catalogue so any module can declare deps as `libs.kotlinx.c
 
    ```toml
    [versions]
-   kotlin           = "2.2.0"           # bump to 2.3.x when GA
-   coroutines       = "1.10.0"
-   serialization    = "1.7.0"
-   datetime         = "0.6.0"
-   koog             = "0.4.0"           # confirm latest before pinning
-   ktor             = "3.0.0"
-   mcp              = "0.5.0"           # io.modelcontextprotocol:kotlin-sdk
-   sqliteJdbc       = "3.46.0.0"
-   sqliteVec        = "0.1.5"           # native bundle
-   flyway           = "10.20.0"
+   kotlin           = "2.3.0"           # bump to 2.3.x when GA
+   coroutines       = "1.10.2"
+   serialization    = "1.11.0"
+   datetime         = "0.7.1"
+   koog             = "0.8.0"           # confirm latest before pinning
+   ktor             = "3.2.3"
+   mcp              = "0.11.0"           # io.modelcontextprotocol:kotlin-sdk
+   sqliteJdbc       = "3.53.0.0"
+   sqliteVec        = "0.1.8"           # native bundle
+   flyway           = "11.20.3"
    telegram         = "8.0.0"           # org.telegram:telegrambots
    jgit             = "6.10.0.202406032230-r"
-   bouncycastle     = "1.78.1"
-   pf4j             = "3.12.0"
-   oras             = "0.2.5"           # land.oras:oras-java-sdk; verify
+   bouncycastle     = "1.84"
+   pf4j             = "3.15.0"
+   oras             = "0.6.0"           # land.oras:oras-java-sdk; verify
    tomlj            = "1.1.1"
-   kotlinLogging    = "7.0.0"
-   logback          = "1.5.6"
-   otel             = "1.42.1"
+   kotlinLogging    = "8.0.02"
+   logback          = "1.5.26"
+   otel             = "1.58.0"
    junit            = "5.11.0"
-   kotest           = "5.9.1"
-   mockk            = "1.13.12"
-   testcontainers   = "1.20.1"
-   detekt           = "1.23.7"
-   ktlint           = "12.1.1"          # plugin version
+   kotest           = "6.1.2"
+   mockk            = "1.14.9"
+   testcontainers   = "2.0.3"
+   detekt           = "1.23.8"
+   ktlint           = "14.0.1"          # plugin version
    shadow           = "8.1.1"
    ```
 

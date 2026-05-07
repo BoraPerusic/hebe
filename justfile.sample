@@ -1,0 +1,695 @@
+# justfile
+
+set shell := ["bash", "-c"]
+
+# =============================================================================
+# 🟢 GLOBAL HELPERS
+# =============================================================================
+
+default:
+    @just --list
+
+# Helper to resolve app name to path (or return path if it exists)
+_find-app name:
+    @path=$(find agents frontends infra services tools -maxdepth 2 -name "{{name}}" -type d -print -quit); \
+    if [ -n "$path" ]; then \
+        echo "$path"; \
+    elif [ -d "{{name}}" ]; then \
+        echo "{{name}}"; \
+    else \
+        echo "❌ Error: App '{{name}}' not found." >&2; \
+        exit 1; \
+    fi
+
+# Detect the technology stack of a service
+# Usage: just info services/eso
+info service:
+    @if [ -f "{{service}}/backstage.json" ]; then \
+        echo "ts:yarn"; \
+    elif [ -f "{{service}}/package.json" ]; then \
+        echo "ts:vue"; \
+    elif [ -f "{{service}}/pyproject.toml" ] || [ -f "{{service}}/main.py" ]; then \
+        echo "python:FastAPI"; \
+    elif [ -f "{{service}}/build.gradle.kts" ]; then \
+        if grep -q "boot.starter" "{{service}}/build.gradle.kts"; then \
+            echo "kotlin:Boot"; \
+        else \
+            echo "kotlin:Ktor"; \
+        fi; \
+    else \
+        echo "unknown"; \
+    fi
+
+
+# Generic BUILD wrapper
+build app_name="":
+    @if [ -z "{{app_name}}" ]; then \
+        just build-all; \
+    else \
+        service=$(just _find-app {{app_name}}); \
+        if [ -z "$service" ]; then exit 1; fi; \
+        type=$(just info "$service"); \
+        if [ "$type" = "kotlin:Boot" ] || [ "$type" = "kotlin:Ktor" ]; then \
+            just build-kt "$service"; \
+        elif [ "$type" = "python:FastAPI" ]; then \
+            just proto-py; \
+            cd "$service" && uv sync; \
+        elif [ "$type" = "ts:vue" ]; then \
+            just build-vue "$service"; \
+        elif [ "$type" = "ts:yarn" ]; then \
+            just build-yarn "$service"; \
+        else \
+            echo "Unknown service type: $type"; \
+            exit 1; \
+        fi; \
+    fi
+
+# Build ALL services in agents, frontends, services, tools
+build-all:
+    @echo "🏗️  Build ALL services..."
+    @find agents frontends infra services tools -mindepth 1 -maxdepth 1 -type d -print | while read svc; do \
+        echo "---------------------------------------------------"; \
+        echo "🔨 Building $svc..."; \
+        type=$(just info "$svc"); \
+        if [ "$type" = "unknown" ]; then \
+            echo "⚠️  Skipping unknown service type: $svc"; \
+        else \
+            just build "$svc" < /dev/null; \
+        fi; \
+    done
+    @echo "✅ All builds completed!"
+
+
+# Generic RUN wrapper
+run app_name:
+    @service=$(just _find-app {{app_name}}); \
+    if [ -z "$service" ]; then exit 1; fi; \
+    type=$(just info "$service"); \
+    echo "🚀 Running $service ($type)..."; \
+    if [ "$type" = "kotlin:Boot" ]; then \
+        just run-kt-boot "$service"; \
+    elif [ "$type" = "kotlin:Ktor" ]; then \
+        just run-kt-ktor "$service"; \
+    elif [ "$type" = "python:FastAPI" ]; then \
+        just run-py "$service"; \
+    elif [ "$type" = "ts:vue" ]; then \
+        just run-vue "$service"; \
+    elif [ "$type" = "ts:yarn" ]; then \
+        just run-yarn "$service"; \
+    else \
+        echo "Unknown service type: $type"; \
+        exit 1; \
+    fi
+
+# Generic DEPLOY wrapper
+deploy app_name:
+    @service=$(just _find-app {{app_name}}); \
+    if [ -z "$service" ]; then exit 1; fi; \
+    type=$(just info "$service"); \
+    if [ "$type" = "kotlin:Boot" ] || [ "$type" = "kotlin:Ktor" ]; then \
+        just deploy-kt "$service"; \
+    elif [ "$type" = "python:FastAPI" ]; then \
+        just deploy-py "$service"; \
+    elif [ "$type" = "ts:vue" ]; then \
+        just deploy-vue "$service"; \
+    elif [ "$type" = "ts:yarn" ]; then \
+        just deploy-yarn "$service"; \
+    else \
+        echo "Unknown service type: $type"; \
+        exit 1; \
+    fi
+
+# Initialize the repo (Download dependencies, prepare protos)
+init: proto
+    @echo "Initializing Kotlin..."
+    ./gradlew --quiet dependencies
+    @echo "Initializing Python..."
+    just py-sync-all
+    @echo "Initializing Vue..."
+    just vue-install-all
+
+# Clean everything
+clean:
+    ./gradlew clean
+    find . -type d -name "__pycache__" -exec rm -rf {} +
+    find . -type d -name "node_modules" -exec rm -rf {} +
+    find . -type d -name ".venv" -exec rm -rf {} +
+    find . -type d -name "dist" -exec rm -rf {} +
+
+# =============================================================================
+# 🟡 SHARED PROTOCOLS (The Glue)
+# =============================================================================
+
+# Generates Protos for ALL languages (Kotlin, Python, JS)
+proto:
+    ./gradlew :shared:proto:assemble
+
+# Specific helpers if you only need one language refreshed
+proto-py:
+    ./gradlew :shared:proto:preparePythonPackage
+
+proto-js:
+    ./gradlew :shared:proto:prepareJsPackage
+
+# =============================================================================
+# 🔵 KOTLIN SERVICES (Spring Boot & Ktor)
+# =============================================================================
+
+# Build a Kotlin service (JAR)
+# Usage: just build-kt services/eso
+build-kt service:
+    @service=$(just _find-app {{service}}); \
+    module=":${service//\//:}"; \
+    ./gradlew "${module}:build" --no-build-cache
+
+# Run a Kotlin Spring Boot service locally
+run-kt-boot service:
+    @service=$(just _find-app {{service}}); \
+    module=":${service//\//:}"; \
+    set -a; \
+    source local.env; \
+    source llm.secrets.env; \
+    source erp.secrets.env; \
+    set +a; \
+    ./gradlew "${module}:bootRun" --no-build-cache
+
+# Run a Kotlin Ktor (standard) service locally
+run-kt-ktor service:
+    @service=$(just _find-app {{service}}); \
+    module=":${service//\//:}"; \
+    set -a; \
+    source local.env; \
+    source llm.secrets.env 2>/dev/null || true; \
+    source erp.secrets.env 2>/dev/null || true; \
+    set +a; \
+    ./gradlew "${module}:run"
+
+# Run Kotlin Ktor service via main class (for tools/*-mcp that use embeddedServer directly)
+run-kt-ktor-main service:
+    @service=$(just _find-app {{service}}); \
+    module=":${service//\//:}"; \
+    set -a; \
+    source local.env; \
+    source llm.secrets.env 2>/dev/null || true; \
+    source erp.secrets.env 2>/dev/null || true; \
+    set +a; \
+    ./gradlew "${module}:run" --args="--no-daemon"
+
+# Deploy Kotlin service to Local K3s (using Jib)
+deploy-kt service:
+    @service=$(just _find-app {{service}}); \
+    module=":${service//\//:}"; \
+    ./gradlew "${module}:jibDockerBuild" --no-configuration-cache \
+      -Djib.dockerClient.executable=$(which docker) \
+      -Djib.dockerClient.environment.DOCKER_HOST="unix://$HOME/.rd/docker.sock" ; \
+    echo "🚀 ${service} loaded into K3s!"
+
+# =============================================================================
+# 🐍 PYTHON SERVICES (uv)
+# =============================================================================
+
+# Sync dependencies for ALL python apps
+py-sync-all: proto-py
+    @echo "Syncing Python projects..."
+    @find . -name "pyproject.toml" -not -path "*/shared/proto/*" -exec dirname {} \; | while read dir; do \
+        echo "Syncing $dir..."; \
+        (cd "$dir" && uv sync) < /dev/null; \
+    done
+
+# Run tests for a specific Python service
+# Usage: just test-py agents/eso
+test-py service: proto-py
+    cd {{service}} && (uv run pytest || (code=$?; if [ $code -eq 5 ]; then echo "No tests collected. Skipping..."; exit 0; else exit $code; fi))
+
+# Run Python service locally
+run-py service: proto-py
+    @service="{{service}}"; \
+    set -a; \
+    [ -f local.env ] && source local.env; \
+    [ -f llm.secrets.env ] && source llm.secrets.env; \
+    [ -f erp.secrets.env ] && source erp.secrets.env; \
+    [ -f .env ] && source .env; \
+    set +a; \
+    if [ -f "${service}/src/main.py" ]; then \
+        (cd "$service" && uv run python -m src.main); \
+    elif [ -f "${service}/main.py" ]; then \
+        (cd "$service" && uv run python main.py); \
+    else \
+        echo "No runnable entrypoint found in ${service}."; \
+        exit 1; \
+    fi
+
+# Deploy Python service to Local K3s (Standard Docker build)
+deploy-py service: proto-py
+    cd {{service}} && uv sync # Ensure lockfile is fresh
+    docker build -f {{service}}/Dockerfile -t $(basename {{service}}):local .
+    @echo "🚀 $(basename {{service}}) loaded into K3s!"
+
+# =============================================================================
+# 🎨 VUE FRONTENDS (npm + vite)
+# =============================================================================
+
+# Install dependencies for ALL vue apps
+vue-install-all: proto-js
+    @echo "Installing Vue projects..."
+    @find frontends -name "package.json" -exec dirname {} \; | while read dir; do \
+        echo "Installing $dir..."; \
+        (cd "$dir" && npm install) < /dev/null; \
+    done
+
+install-vue service:
+    cd {{service}} && npm install
+
+# Build Vue app for production
+# Usage: just build-vue frontends/eso
+build-vue service: proto-js
+    cd {{service}} && npm run build
+
+# Run Vue app dev server
+run-vue service: proto-js
+    cd {{service}} && npm run dev
+
+# Deploy Vue service to Local K3s (Docker build of /dist)
+deploy-vue service:
+    just build-vue {{service}}
+    docker build -t $(basename {{service}}):local {{service}}
+    @echo "🚀 $(basename {{service}}) loaded into K3s!"
+
+# =============================================================================
+# 🎸 BACKSTAGE SERVICES
+# =============================================================================
+
+# Run Backstage (Frontend & Backend Dev Servers)
+run-yarn service:
+    cd {{service}} && yarn dev
+
+# Build Backstage (Backend)
+build-yarn service:
+    cd {{service}} && yarn install && yarn tsc && yarn build:backend
+
+# Deploy Backstage to Local K3s
+deploy-yarn service:
+    just build-yarn {{service}}
+    docker build . -f {{service}}/packages/backend/Dockerfile -t $(basename {{service}}):local
+    @echo "🚀 $(basename {{service}}) loaded into K3s!"
+
+
+# =============================================================================
+# 📚 DOCUMENTATION
+# =============================================================================
+
+# Generate OpenAPI specs for all backend apps and move them to docs/
+docs-openapi:
+    ./scripts/generate-openapi.sh
+
+# Generate TechDocs configuration and copy md files for apps and platform
+docs-techdocs:
+    ./scripts/generate-techdocs.sh
+
+# Complete documentation generation
+docs-all: docs-openapi docs-techdocs
+
+# =============================================================================
+# 🧹 LINTING & HELPERS
+# =============================================================================
+
+# List all Python services
+lang-python:
+    @find . -type d \( -name "node_modules" -o -name ".venv" -o -path "./shared/proto" -o -name ".gradle" -o -name "build" -o -name ".kotlin" -o -name "dist" -o -name "__pycache__" \) -prune -o -name "pyproject.toml" -print | while read file; do dirname "$file"; done | sort
+
+# List all Kotlin services
+lang-kotlin:
+    @find agents services infra tools shared/libs/kotlin -maxdepth 2 -name "build.gradle.kts" -print | while read file; do dirname "$file"; done | sort
+
+# List all TypeScript/Vue services
+lang-ts:
+    @find frontends -type d \( -name "node_modules" -o -name "dist" -o -name "coverage" \) -prune -o -name "package.json" -print | while read file; do dirname "$file"; done | sort
+
+# Lint a specific Python service
+# Usage: just lint-py agents/eso
+lint-py service:
+    cd {{service}} && uv run ruff check . --fix
+
+# Lint a specific Kotlin service
+# Usage: just lint-kt services/eso
+lint-kt service:
+    @service=$(just _find-app {{service}}); \
+    module=":${service//\//:}"; \
+    ./gradlew "${module}:ktlintFormat"
+
+# Lint a specific TypeScript/Vue service
+# Usage: just lint-ts frontends/eso
+lint-ts service:
+    cd {{service}} && npm run lint
+
+# Lint EVERYTHING (interactive/fix)
+lint-all:
+    @echo "🧹 Linting Python..."
+    @just lang-python | while read svc; do just lint-py "$svc" < /dev/null; done
+    @echo "🧹 Linting Kotlin..."
+    @just lang-kotlin | while read svc; do just lint-kt "$svc" < /dev/null; done
+    @echo "🧹 Linting TypeScript..."
+    @just lang-ts | while read svc; do just lint-ts "$svc" < /dev/null; done
+
+# Lint specific app or all
+lint app_name="":
+    @if [ -z "{{app_name}}" ]; then \
+        just lint-all; \
+    else \
+        service=$(just _find-app {{app_name}}); \
+        if [ -z "$service" ]; then exit 1; fi; \
+        echo "🧹 Linting $service..."; \
+        type=$(just info "$service"); \
+        if [ "$type" = "python:FastAPI" ]; then \
+            just lint-py "$service"; \
+        elif [ "$type" = "kotlin:Boot" ] || [ "$type" = "kotlin:Ktor" ]; then \
+            just lint-kt "$service"; \
+        elif [ "$type" = "ts:vue" ]; then \
+            just lint-ts "$service"; \
+        else \
+            echo "Unknown service type for linting: $type"; \
+            exit 1; \
+        fi; \
+    fi
+
+# Check linting on EVERYTHING (read-only / CI)
+lint-check:
+    @echo "🔍 Checking Python..."
+    @just lang-python | while read svc; do (cd "$svc" && uv run ruff check .) < /dev/null; done
+    @echo "🔍 Checking Kotlin..."
+    @./gradlew ktlintCheck
+    @echo "🔍 Checking TypeScript..."
+    @just lang-ts | while read svc; do (cd "$svc" && npm run type-check) < /dev/null; done
+
+# =============================================================================
+# 🧪 TESTING
+# =============================================================================
+
+# Run tests for a specific Kotlin service
+# Usage: just test-kt services/eso
+test-kt service:
+    @service=$(just _find-app {{service}}); \
+    module=":${service//\//:}"; \
+    ./gradlew "${module}:test"
+
+# Run tests for a specific TypeScript/Vue service
+# Usage: just test-ts frontends/eso
+test-ts service:
+    cd {{service}} && (npm run test:unit -- --run || (code=$?; if [ $code -eq 1 ]; then echo "No tests available, no tests were run"; exit 0; else exit $code; fi))
+
+# Run ALL tests
+test-all:
+    @echo "🧪 Testing Python..."
+    @just lang-python | while read svc; do just test-py "$svc" < /dev/null; done
+    @echo "🧪 Testing Kotlin..."
+    @just lang-kotlin | while read svc; do just test-kt "$svc" < /dev/null; done
+    @echo "🧪 Testing TypeScript..."
+    @just lang-ts | while read svc; do just test-ts "$svc" < /dev/null; done
+
+
+# =============================================================================
+# 🏗️ LOCAL INFRASTRUCTURE
+# =============================================================================
+
+
+# Start local infrastructure (WireMock, Postgres, MSSQL) using Skaffold/Kustomize
+# This only starts the workloads. Init must be run first.
+local-infra-up:
+    # Ensure ignore-missing-schemas is set to allow generic secrets
+    kustomize build deployment/local --enable-helm --load-restrictor LoadRestrictionsNone | kubectl apply -f -
+
+# Stop local infrastructure (Retains Data)
+# This only deletes the workloads. PV/PVC/Secrets/Namespace remain.
+local-infra-down:
+    kustomize build deployment/local --enable-helm --load-restrictor LoadRestrictionsNone | kubectl delete -f -
+
+
+# Initialize local infrastructure (Namespace, Secrets, PVCs)
+# Call again to wipe and reset.
+local-infra-init:
+    @echo "⚠️  Deleting existing namespace and PVs if they exist..."
+    kubectl delete namespace local --ignore-not-found
+    # PVC deletion by namespace deletion usually triggers PV release/delete depending on reclaim policy.
+    # But just in case we manage PVs explicitly or if retain policy is set:
+    kubectl delete pv -l namespace=local --ignore-not-found
+    @echo "Creating Namespace, Secrets, and PVCs..."
+    kustomize build deployment/local/init --load-restrictor LoadRestrictionsNone | kubectl apply -f -
+    @echo "Start the database to allow Init Job to run..."
+
+local-erp-mock:
+    psql -h localhost -p 7432 -U dfpartner -d erp_mock -f db/erp-data/01_create_tables_pg.sql
+    psql -h localhost -p 7432 -U dfpartner -d erp_mock -f db/erp-data/02_load_data_pg.sql
+    psql -h localhost -p 7432 -U dfpartner -d erp_mock -f db/erp-data/03_init_mock_data_pg.sql
+
+# Tail logs for local infrastructure
+local-infra-logs:
+    kubectl logs -f -l app=wiremock -l component=database --max-log-requests=10
+
+# =============================================================================
+# 🚀 LOCAL APP DEPLOYMENT (Using Kustomize)
+# =============================================================================
+
+# Create/Update public config map from local.env AND secrets
+app-config:
+    -kubectl delete configmap app-public-config -n local
+    -kubectl delete secret erp-creds -n local
+    -kubectl delete secret llm-creds -n local
+    -kubectl delete secret back-creds -n local
+    kustomize build deployment/local/config --load-restrictor LoadRestrictionsNone | kubectl apply -f -
+
+# Apply K8s manifests for an app (deployment/apps/<app>)
+# Usage: just app-up eso-api (or just app-up services/eso-api)
+app-up app_path:
+    @app=$(basename {{app_path}}); \
+    if [ ! -d "deployment/apps/$app" ]; then \
+        echo "❌ Error: App deployment folder 'deployment/apps/$app' not found."; \
+        exit 1; \
+    fi; \
+    echo "🚀 Deploying $app to K3s..."; \
+    kustomize build deployment/apps/$app --load-restrictor LoadRestrictionsNone | kubectl apply -f -
+
+# Delete K8s manifests for an app
+# Usage: just app-down eso-api
+app-down app_path:
+    @app=$(basename {{app_path}}); \
+    if [ ! -d "deployment/apps/$app" ]; then \
+        echo "❌ Error: App deployment folder 'deployment/apps/$app' not found."; \
+        exit 1; \
+    fi; \
+    echo "🛑 Removing $app from K3s..."; \
+    kustomize build deployment/apps/$app --load-restrictor LoadRestrictionsNone | kubectl delete -f -
+
+# =============================================================================
+# 🏷️ TAG & RELEASE
+# =============================================================================
+
+# Create a new version tag for an application and push it
+# Usage: just tag eso-api major|minor|patch|set [version]
+tag app_name level="patch" version="":
+    #!/usr/bin/env bash
+    set -e
+
+    APP_NAME="{{app_name}}"
+    LEVEL="{{level}}"
+    CUSTOM_VERSION="{{version}}"
+
+    if [ "$LEVEL" != "major" ] && [ "$LEVEL" != "minor" ] && [ "$LEVEL" != "patch" ] && [ "$LEVEL" != "set" ]; then
+        echo "❌ Error: Level must be 'major', 'minor', 'patch', or 'set'."
+        exit 1
+    fi
+
+    if [ "$LEVEL" = "set" ] && [ -z "$CUSTOM_VERSION" ]; then
+        echo "❌ Error: 'set' requires a version number. E.g., just tag <app> set 1.2.3"
+        exit 1
+    fi
+
+    # Check branch
+    BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    if [ "$BRANCH" != "main" ] && [ "$BRANCH" != "master" ]; then
+        read -p "⚠️  You are on branch '$BRANCH', not 'main' (or 'master'). Are you sure you want to create a release tag? [y/N] " -n 1 -r
+        echo ""
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            echo "❌ Aborting."
+            exit 1
+        fi
+    fi
+
+    tag_service() {
+        local svc_path="$1"
+        local svc_name=$(basename "$svc_path")
+
+        # Get the latest tag for the service
+        # Format: <service-name>/vX.Y.Z
+        LATEST_TAG=$(git tag -l "${svc_name}/v*" | sed "s|^${svc_name}/v||" | sort -V | tail -n 1)
+
+        if [ "$LEVEL" = "set" ]; then
+            NEW_VERSION="${CUSTOM_VERSION}"
+        else
+            if [ -z "$LATEST_TAG" ]; then
+                echo "⚠️  No existing tags found for ${svc_name}. Starting at 0.0.0."
+                MAJOR=0
+                MINOR=0
+                PATCH=0
+            else
+                IFS='.' read -r -a VERSION_PARTS <<< "$LATEST_TAG"
+                MAJOR="${VERSION_PARTS[0]}"
+                MINOR="${VERSION_PARTS[1]}"
+                PATCH="${VERSION_PARTS[2]}"
+            fi
+
+            if [ "$LEVEL" = "major" ]; then
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+            elif [ "$LEVEL" = "minor" ]; then
+                MINOR=$((MINOR + 1))
+                PATCH=0
+            elif [ "$LEVEL" = "patch" ]; then
+                PATCH=$((PATCH + 1))
+            fi
+
+            NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+        fi
+
+        NEW_TAG="${svc_name}/v${NEW_VERSION}"
+
+        echo "🏷️  Creating new tag: $NEW_TAG"
+        git tag "$NEW_TAG"
+
+        echo "🚀 Pushing tag to origin..."
+        git push origin "$NEW_TAG"
+
+        echo "✅ Successfully tagged and pushed $NEW_TAG"
+    }
+
+    if [ "$APP_NAME" = "all" ]; then
+        echo "📦 Tagging ALL services..."
+        find agents frontends infra services tools -mindepth 1 -maxdepth 1 -type d -print | sort | while read app_path; do
+            echo "-----------------------------------------------------------------"
+            echo "🎯 Tagging $app_path..."
+            tag_service "$app_path"
+        done
+        echo "✅ All services tagged!"
+    else
+        # Resolve app path. If not found, it exits with error from the helper.
+        APP_PATH=$(just _find-app "$APP_NAME")
+        tag_service "$APP_PATH"
+    fi
+
+# List all services, their info, and latest tag
+content:
+    @echo "📦 Services Content:"
+    @printf "%-30s | %-15s | %-15s\n" "SERVICE" "TYPE" "LATEST TAG"
+    @echo "-----------------------------------------------------------------"
+    @find agents frontends infra services tools -mindepth 1 -maxdepth 1 -type d -print | sort | while read app_path; do \
+        app=$(basename "$app_path"); \
+        type=$(just info "$app_path"); \
+        latest=$(git tag -l "$app/v*" | sed "s|^$app/v||" | sort -V | tail -n 1); \
+        if [ -z "$latest" ]; then \
+            latest="none"; \
+        fi; \
+        printf "%-30s | %-15s | %-15s\n" "$app" "$type" "$latest"; \
+    done
+
+# =============================================================================
+# 🔐 AZURE SECRETS
+# =============================================================================
+
+# Fetch secrets from Azure Key Vault and write to output file
+# Usage: just secrets <config-file>
+# Example: just secrets env.azure
+#
+# Config file format:
+#   CONFIGURATION.VAULT=tenant-id:vault-name
+#   CONFIGURATION.FILE=output.env
+#   # Comments and empty lines are ignored
+#   ENV_VAR=secret-name-in-keyvault
+#
+# The recipe will fetch each secret and write "ENV_VAR=value" to the output file.
+secrets config_file:
+    #!/usr/bin/env bash
+    set -e
+
+    CONFIG_FILE="{{config_file}}"
+
+    # Check if config file exists
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "❌ Error: Config file '$CONFIG_FILE' not found." >&2
+        exit 1
+    fi
+
+    # Read configuration variables
+    VAULT_VALUE=""
+    OUTPUT_FILE=""
+
+    while IFS='=' read -r key value; do
+        # Skip empty lines and comments
+        if [ -z "$key" ] || [[ "$key" =~ ^# ]]; then
+            continue
+        fi
+
+        if [[ "$key" == "CONFIGURATION.VAULT" ]]; then
+            VAULT_VALUE="$value"
+        elif [[ "$key" == "CONFIGURATION.FILE" ]]; then
+            OUTPUT_FILE="$value"
+        fi
+    done < "$CONFIG_FILE"
+
+    # Validate configuration
+    if [ -z "$VAULT_VALUE" ]; then
+        echo "❌ Error: CONFIGURATION.VAULT is required in config file" >&2
+        exit 1
+    fi
+
+    if [ -z "$OUTPUT_FILE" ]; then
+        echo "❌ Error: CONFIGURATION.FILE is required in config file" >&2
+        exit 1
+    fi
+
+    # Parse vault string (tenant:keyvault)
+    TENANT_ID="${VAULT_VALUE%%:*}"
+    KEY_VAULT="${VAULT_VALUE#*:}"
+
+    if [ -z "$TENANT_ID" ] || [ -z "$KEY_VAULT" ]; then
+        echo "❌ Error: Invalid VAULT format. Expected: tenant-id:keyvault-name" >&2
+        exit 1
+    fi
+
+    echo "🔐 Fetching secrets from Key Vault: $KEY_VAULT (tenant: $TENANT_ID)"
+    echo "📝 Writing to: $OUTPUT_FILE"
+
+    # Check if user is logged into Azure
+    if ! az account show > /dev/null 2>&1; then
+        echo "❌ Error: Not logged into Azure. Run 'az login --tenant $TENANT_ID' first." >&2
+        exit 1
+    fi
+
+    # Clear/create output file
+    > "$OUTPUT_FILE"
+
+    # Read config file again and process each secret
+    while IFS='=' read -r key secret_name; do
+        # Skip empty lines, comments, and configuration variables
+        if [ -z "$key" ] || [[ "$key" =~ ^# ]] || [[ "$key" == CONFIGURATION.* ]]; then
+            continue
+        fi
+
+        # Skip if secret_name is empty
+        if [ -z "$secret_name" ]; then
+            continue
+        fi
+
+        echo "Fetching: $secret_name -> $key"
+        VALUE=$(az keyvault secret show --vault-name "$KEY_VAULT" --name "$secret_name" --query "value" -o tsv 2>/dev/null)
+
+        if [ -n "$VALUE" ]; then
+            echo "$key=$VALUE" >> "$OUTPUT_FILE"
+            echo "  ✓ Saved to $OUTPUT_FILE"
+        else
+            echo "  ⚠️  Warning: Secret '$secret_name' not found in Key Vault, skipping $key" >&2
+        fi
+    done < "$CONFIG_FILE"
+
+    echo "✅ Done! Secrets written to $OUTPUT_FILE"
+    echo "   Source them with: source $OUTPUT_FILE"
+

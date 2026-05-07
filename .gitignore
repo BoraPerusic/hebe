@@ -1,0 +1,69 @@
+# Default ignored files
+/shelf/
+/.idea/workspace.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+# Default ignored files
+
+# Gradle
+.gradle/
+build/
+**/build/
+**/bin/
+
+# IntelliJ / IDEA
+.idea/
+*.iml
+out/
+.run/
+
+# Kotlin/Java
+*.class
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.war
+*.ear
+
+# JavaScript
+**/dist/
+**/node_modules/
+.eslintcache
+
+# VS Code
+.vscode/
+
+# MacOS
+.DS_Store
+
+# Local web UI runtime config (contains keys). Do not commit.
+web/js/config.js
+# Ignore Gradle project-specific cache directory
+.gradle
+
+# Ignore Gradle build output directory
+build
+
+# Ignore helm charts build by kustomize
+deployment/**/charts
+
+# Ignore Kotlin plugin data
+.kotlin
+
+# python cache
+**/__pycache__/
+/.output.txt
+
+# secretss
+**/*.secrets.env
+**/*.private.env.json
+
+# npm
+/.npm-cache/
+/.opencode/
+
+# Azure secrets output files
+*.kv.env
+azure-connections.env

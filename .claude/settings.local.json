@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs ls *)",
+      "WebSearch",
+      "Bash(git *)",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__query-docs",
+      "Bash(just build-kt *)",
+      "Bash(just test-kt *)",
+      "Bash(just info *)",
+      "Bash(just lint-kt *)",
+      "Bash(./gradlew :spike:calcite-v1:test --tests \"spike.calcite.v1.schema.RoundTripSpec\" -i)",
+      "Bash(grep -nE \"^- \\\\[\\(x| |!\\)\\\\] \\(Q[0-9]|Implement|Acceptance|Commit \\\\+ push: \\\\`\\\\[spike\\\\] A\\\\.3\\)\" /Users/bora/Dev/ai-platform/tasks-phase-00.md)"
+    ]
+  }
+}
