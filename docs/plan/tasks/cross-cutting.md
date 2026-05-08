@@ -20,8 +20,8 @@ A small, reusable HTTP record/replay layer for tests that target real HTTP servi
 ### Files to create
 
 - `modules/test-fixtures/build.gradle.kts` (new — a new module just for cross-test fixtures, OR put under `:modules:providers:openai-compat:src/testFixtures`)
-- `modules/test-fixtures/src/main/kotlin/com/talos/testing/HttpRecorder.kt` (new)
-- `modules/test-fixtures/src/main/kotlin/com/talos/testing/HttpReplayer.kt` (new)
+- `modules/test-fixtures/src/main/kotlin/com/hebe/testing/HttpRecorder.kt` (new)
+- `modules/test-fixtures/src/main/kotlin/com/hebe/testing/HttpReplayer.kt` (new)
 - `modules/test-fixtures/src/main/resources/recordings/.gitkeep` (new)
 - Tests of the recorder/replayer themselves
 
@@ -68,7 +68,7 @@ A scriptable test `Channel` that submits programmed `IncomingMessage`s and captu
 
 ### Files to create
 
-- `modules/test-fixtures/src/main/kotlin/com/talos/testing/MockChannel.kt` (new)
+- `modules/test-fixtures/src/main/kotlin/com/hebe/testing/MockChannel.kt` (new)
 - Tests
 
 ### Detailed work
@@ -122,7 +122,7 @@ An in-memory `MemoryStore` for unit tests that don't need SQLite. Drops vector +
 
 ### Files to create
 
-- `modules/test-fixtures/src/main/kotlin/com/talos/testing/InMemoryMemoryStore.kt` (new)
+- `modules/test-fixtures/src/main/kotlin/com/hebe/testing/InMemoryMemoryStore.kt` (new)
 - Tests
 
 ### Detailed work
@@ -159,7 +159,7 @@ CI fails if line coverage on `core`, `memory`, `security`, `plugins` modules dro
 
 ### Files to create / modify
 
-- `build-logic/src/main/kotlin/talos.coverage.gradle.kts` (new — convention plugin)
+- `build-logic/src/main/kotlin/hebe.coverage.gradle.kts` (new — convention plugin)
 - Each of the four modules' `build.gradle.kts` (edit — apply the convention)
 - Tests via CI
 
@@ -247,7 +247,7 @@ A small Gradle task `./gradlew :tests:recordTrace --prompt="..."` that captures 
 
 ### Files to create
 
-- `modules/test-fixtures/src/main/kotlin/com/talos/testing/TraceRecorder.kt` (new)
+- `modules/test-fixtures/src/main/kotlin/com/hebe/testing/TraceRecorder.kt` (new)
 - `modules/test-fixtures/build.gradle.kts` (edit — add the task)
 - Tests
 

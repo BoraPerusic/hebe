@@ -9,7 +9,7 @@
 - [ ] M0.T3 — Detekt + ktlint baseline
 - [ ] M0.T4 — CI pipeline (GitHub Actions)
 - [ ] M0.T5 — api module: kernel ABI types
-- [ ] M0.T6 — plugin-api module: TalosPlugin, PluginHost, etc.
+- [ ] M0.T6 — plugin-api module: HebePlugin, PluginHost, etc.
 - [ ] M0.T7 — observability module: OTel + structured logging
 - [ ] M0.T8 — config module: TOML schema + loader
 - [ ] M0.T9 — config module: secrets store (AES-256-GCM + OS keychain)

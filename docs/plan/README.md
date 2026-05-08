@@ -1,4 +1,4 @@
-# Talos — brainstorming record (discussion summary)
+# Hebe — brainstorming record (discussion summary)
 
 A chronological record of the conversation that produced the current v1 plan. The point of this document is to preserve **how we got here** — the reasoning, the alternatives considered, the points where the user's input changed the trajectory — not just the final decisions.
 
@@ -7,7 +7,7 @@ For the final decisions themselves, see:
 - [`v1-specs.md`](v1-specs.md) — scope contract.
 - [`v1-architecture.md`](v1-architecture.md) — wiring diagram + schemas.
 - [`v1-tasks.md`](v1-tasks.md) — task list.
-- [`talos-brainstorming-responses.md`](talos-brainstorming-responses.md) — the user's answers to the open questions.
+- [`hebe-brainstorming-responses.md`](hebe-brainstorming-responses.md) — the user's answers to the open questions.
 
 This is the meeting-minutes / decision-log layer above all of that.
 
@@ -22,7 +22,7 @@ The repo arrived with `req.md` declaring intent ("a Kotlin version of the *Claw 
 - `docs/gemini/` — Gemini: brief sketches, but contributed two original ideas (JSR-223 trusted scripting, agent self-evolution writing `.kts`).
 - `docs/minimax/` — MiniMax: comprehensive features list, recommended Kotlin Native (against the tide), introduced "everything goes through tools" as a hint and preemptive history pruning.
 
-Each agent had produced its own `talos-architecture.md`, `talos-features.md`, and `talos-brainstorming.md` based on the IronClaw/ZeroClaw codebases and inspirations (OpenClaw, Hermes Agent).
+Each agent had produced its own `hebe-architecture.md`, `hebe-features.md`, and `hebe-brainstorming.md` based on the IronClaw/ZeroClaw codebases and inspirations (OpenClaw, Hermes Agent).
 
 The user's first instruction was to **synthesise** these into one coherent plan, with Claude's draft as the spine, and produce a separate diff document showing what each agent contributed and how they differed.
 
@@ -30,9 +30,9 @@ The user's first instruction was to **synthesise** these into one coherent plan,
 
 Four documents were produced:
 
-- [`talos-architecture.md`](talos-architecture.md) — folded GPT's 5-tier memory naming and "MCP-as-sidecar" framing into Claude's spine; took MiniMax's preemptive pruning, time decay, `tool_search`, catchup execution, tunneling; took Gemini's JGit/Fabric8 implementation picks; discarded MiniMax's KMP module structure and Native recommendation; discarded Gemini's coarse 6-module layout.
-- [`talos-features.md`](talos-features.md) — full v1/v2/L feature list aligned to the architecture.
-- [`talos-brainstorming.md`](talos-brainstorming.md) — opinionated working document with pushbacks, architectural bets, and open questions, deliberately taking positions to invite the user to argue back.
+- [`hebe-architecture.md`](hebe-architecture.md) — folded GPT's 5-tier memory naming and "MCP-as-sidecar" framing into Claude's spine; took MiniMax's preemptive pruning, time decay, `tool_search`, catchup execution, tunneling; took Gemini's JGit/Fabric8 implementation picks; discarded MiniMax's KMP module structure and Native recommendation; discarded Gemini's coarse 6-module layout.
+- [`hebe-features.md`](hebe-features.md) — full v1/v2/L feature list aligned to the architecture.
+- [`hebe-brainstorming.md`](hebe-brainstorming.md) — opinionated working document with pushbacks, architectural bets, and open questions, deliberately taking positions to invite the user to argue back.
 - [`agent-diff.md`](agent-diff.md) — overview table comparing all four agents across ~25 dimensions, then per-agent detailed diffs, then convergence/divergence analysis.
 
 The synthesis flagged the following as **already-converged across three of the four agents** (lowest-risk decisions):
@@ -101,7 +101,7 @@ The user was asked to argue back on the top three places where pushback was expe
 
 ## 5. The brainstorming responses
 
-The user replied via [`talos-brainstorming-responses.md`](talos-brainstorming-responses.md), closing every open question. Highlights and reasoning:
+The user replied via [`hebe-brainstorming-responses.md`](hebe-brainstorming-responses.md), closing every open question. Highlights and reasoning:
 
 | Topic | Decision | Reasoning |
 |---|---|---|
@@ -117,23 +117,23 @@ The user replied via [`talos-brainstorming-responses.md`](talos-brainstorming-re
 | **SOPs v1** | **No, v2 only** | No concrete deploy use case justifies the lift now. |
 | **Multi-tenant** | **Single user, single human per instance** | Closes both §3.2 and §3.6 in one stroke; `TenantScope` dropped entirely. |
 | Identity files | Single `IDENTITY.md` v1 | Agreed. |
-| **LLM provider** | **OpenAI API + BYOK** | The user has an internal LLM Gateway speaking the OpenAI protocol; it handles upstream routing/fallback/Anthropic-native concerns. talos ships **one** OpenAI-compat client. |
+| **LLM provider** | **OpenAI API + BYOK** | The user has an internal LLM Gateway speaking the OpenAI protocol; it handles upstream routing/fallback/Anthropic-native concerns. hebe ships **one** OpenAI-compat client. |
 | Sub-agents | Sub-agents-as-tools | Agreed. |
 | Tool versioning | Not v1 priority | Agreed. |
 | **Plugin loader** | **PF4J** | Skipped the hand-rolled spike. The user wanted to spend novelty budget elsewhere. |
 | Plugin v1 capabilities | `http_client` + `env_read` + `secrets:<name>` | Three is enough for v1. |
 | Plugin signature default | **`optional`** | Stricter `required` documented as the prod posture. |
 | Shell-tool sandbox | v2 | Subprocess wrapper deferred. |
-| Plugin hot-reload | Not a priority | Restart talos on plugin update. |
+| Plugin hot-reload | Not a priority | Restart hebe on plugin update. |
 | **Plugin distribution** | **OCI / container registry (ACR)** | Plugins are first-party / internal-only for v1, v2, and beyond. No public marketplace. |
 
-The single biggest collapse: the OpenAI API + BYOK answer. Once the user said "we have an internal LLM Gateway that handles that," **provider routing, fallback chains, native Anthropic adapter, Bedrock/Gemini/Azure adapters, and Hermes-style `ProviderTransport` all collapsed out of v1 scope**. talos doesn't try to duplicate gateway responsibility; it ships one OpenAI-compatible client.
+The single biggest collapse: the OpenAI API + BYOK answer. Once the user said "we have an internal LLM Gateway that handles that," **provider routing, fallback chains, native Anthropic adapter, Bedrock/Gemini/Azure adapters, and Hermes-style `ProviderTransport` all collapsed out of v1 scope**. hebe doesn't try to duplicate gateway responsibility; it ships one OpenAI-compatible client.
 
-The second-biggest collapse: ACR distribution + PF4J. Originally we proposed plugins as files in `~/.talos/plugins/`. The user clarified plugins will come from a container registry (OCI artifacts, in their case ACR). This shapes a new `oras pull` flow, Azure auth integration, and the plugin SDK as an internal Gradle template (not a public marketplace).
+The second-biggest collapse: ACR distribution + PF4J. Originally we proposed plugins as files in `~/.hebe/plugins/`. The user clarified plugins will come from a container registry (OCI artifacts, in their case ACR). This shapes a new `oras pull` flow, Azure auth integration, and the plugin SDK as an internal Gradle template (not a public marketplace).
 
 ## 6. The architecture + features re-aligned (second pass)
 
-Both `talos-architecture.md` and `talos-features.md` were updated to reflect every closed decision. Visible deltas:
+Both `hebe-architecture.md` and `hebe-features.md` were updated to reflect every closed decision. Visible deltas:
 
 - TL;DR rewritten with all eight decisions baked in.
 - Layer 7 trimmed to CLI · Web · Telegram only.
@@ -150,16 +150,16 @@ The features doc grew a "what was removed" footer that catalogues every closure 
 
 Once the architecture and features were stable, the user asked for three concrete v1 documents:
 
-- **[`v1-specs.md`](v1-specs.md)** — the scope contract. v1 thesis ("a single human can run `talos run` and end up with a personal autonomous agent that…"), full in/out lists, NFRs with verification methods, 15 numbered acceptance criteria, milestone overview, risks, "what we explicitly bet on / what falsifies the bet".
-- **[`v1-architecture.md`](v1-architecture.md)** — the wiring diagram. 22 sections covering Gradle module layout, version pins, kernel ABI in Kotlin, plugin ABI, full SQLite DDL for migrations V1–V5, workspace layout, full TOML config schema, secrets store, dispatcher state machine, loop driver + delegate contract, PF4J lifecycle ↔ talos lifecycle mapping, OCI/ACR install flow with media types, NDJSON receipts log format with chain + signature shapes, web console REST + SSE contract, MCP transports, Telegram + CLI contracts, scheduler/heartbeat, deterministic boot sequence, error taxonomy, logging conventions, and the fixed security-check ordering.
+- **[`v1-specs.md`](v1-specs.md)** — the scope contract. v1 thesis ("a single human can run `hebe run` and end up with a personal autonomous agent that…"), full in/out lists, NFRs with verification methods, 15 numbered acceptance criteria, milestone overview, risks, "what we explicitly bet on / what falsifies the bet".
+- **[`v1-architecture.md`](v1-architecture.md)** — the wiring diagram. 22 sections covering Gradle module layout, version pins, kernel ABI in Kotlin, plugin ABI, full SQLite DDL for migrations V1–V5, workspace layout, full TOML config schema, secrets store, dispatcher state machine, loop driver + delegate contract, PF4J lifecycle ↔ hebe lifecycle mapping, OCI/ACR install flow with media types, NDJSON receipts log format with chain + signature shapes, web console REST + SSE contract, MCP transports, Telegram + CLI contracts, scheduler/heartbeat, deterministic boot sequence, error taxonomy, logging conventions, and the fixed security-check ordering.
 - **[`v1-tasks.md`](v1-tasks.md)** — the implementable task list. ~95 tasks across M0–M10 + cross-cutting, each with dependencies, sizes, and acceptance. **The PF4J spike is M6.T1**, deliberately scoped to "load a hello-world plugin from a local JAR and call its tool" — narrow enough to derisk the plugin model before the rest of the loader is built. The doc ends with a single-engineer build order, a two-engineer split, and a cut-line list (least painful first) for if v1 goes long.
 
 ## 8. Where we landed (decisions, in one place)
 
 These are the closed decisions. Linked back to the document where each is most fully described.
 
-1. **Kotlin / JVM only.** GraalVM native-image stays open as a v2 distribution-format optimisation. ([architecture §1](talos-architecture.md))
-2. **No WASM.** Plugins are JVM JARs loaded via **PF4J**; cross-language extensions go through MCP servers. ([architecture §8](talos-architecture.md))
+1. **Kotlin / JVM only.** GraalVM native-image stays open as a v2 distribution-format optimisation. ([architecture §1](hebe-architecture.md))
+2. **No WASM.** Plugins are JVM JARs loaded via **PF4J**; cross-language extensions go through MCP servers. ([architecture §8](hebe-architecture.md))
 3. **PF4J directly** as the plugin framework (no hand-rolled URLClassLoader spike).
 4. **Plugin distribution: OCI / container registry (Azure Container Registry).** Plugins are internal-only for v1, v2, and beyond.
 5. **Plugin `signature_mode = optional`** default in v1.
@@ -194,21 +194,21 @@ The plan is concrete enough to start coding, but a few things will surface durin
 
 ## 10. Naming
 
-The project is being renamed from the working title **talos** to **Talos** — Greek mythology's bronze automaton, forged by Hephaestus to guard Crete: autonomous, single-instance, ran a daily routine (three circumnavigations of the island), tool-using (boulders), with a bounded trust posture (a single ichor vein sealed by a bronze nail). Every angle of the v1 design maps onto Talos: the daemon-mode loop, the one-instance-per-human scope, the routine + heartbeat, the `shell` / `kubectl` tool surface, the deliberately-bounded JVM-plugin trust model.
+The project is being renamed from the working title **hebe** to **Hebe** — Greek mythology's bronze automaton, forged by Hephaestus to guard Crete: autonomous, single-instance, ran a daily routine (three circumnavigations of the island), tool-using (boulders), with a bounded trust posture (a single ichor vein sealed by a bronze nail). Every angle of the v1 design maps onto Hebe: the daemon-mode loop, the one-instance-per-human scope, the routine + heartbeat, the `shell` / `kubectl` tool surface, the deliberately-bounded JVM-plugin trust model.
 
 The rename was argued for in this conversation against two strong alternatives: **Mnemosyne** (Titaness of memory — perfect for the memory subsystem alone, too narrow for the agent as a whole) and **Argus Panoptes** (the many-eyed all-seeing guardian — perfect for the receipts/observability subsystem alone, but with name-collision pressure from Argo CD/Workflows in the K8s ecosystem we'll run alongside).
 
-**Rename scope is deferred.** This document records the choice; the actual sweep across the plan docs (human references) and architecture identifiers (module names like `talos-api` → `talos-api`, package paths `com.talos.*` → `com.talos.*`, binary/config `talos run` → `talos run`, data dir `~/.talos/` → `~/.talos/`, class names `TalosPlugin` → `TalosPlugin`, etc.) will happen once a few related decisions are made — repo/directory rename, any tagline/concept identity, whether to keep "talos" anywhere as historical record.
+**Rename scope is deferred.** This document records the choice; the actual sweep across the plan docs (human references) and architecture identifiers (module names like `hebe-api` → `hebe-api`, package paths `com.hebe.*` → `com.hebe.*`, binary/config `hebe run` → `hebe run`, data dir `~/.hebe/` → `~/.hebe/`, class names `HebePlugin` → `HebePlugin`, etc.) will happen once a few related decisions are made — repo/directory rename, any tagline/concept identity, whether to keep "hebe" anywhere as historical record.
 
 ---
 
 ## Reading order for someone joining the project
 
 1. `req.md` — what the user wants in one page.
-2. `Talos Brainstorming.md` (this file) — how we got from `req.md` to the current plan.
+2. `Hebe Brainstorming.md` (this file) — how we got from `req.md` to the current plan.
 3. `v1-specs.md` — what's in v1, what's out, what passes acceptance.
 4. `v1-architecture.md` — concrete contracts, schemas, lifecycles.
 5. `v1-tasks.md` — pick a task and start coding.
-6. The original synthesis docs (`talos-architecture.md`, `talos-features.md`, `agent-diff.md`) when context on a specific decision is needed.
+6. The original synthesis docs (`hebe-architecture.md`, `hebe-features.md`, `agent-diff.md`) when context on a specific decision is needed.
 
 The original per-agent drafts under `docs/{claude,gpt,gemini,minimax}/` are kept as historical record — a contributor curious about *why* we picked a particular framing will find the alternative framings there.

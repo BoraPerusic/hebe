@@ -21,8 +21,8 @@ References: [`../v1-architecture.md`](../v1-architecture.md) §§11, 13, 20, 22.
 
 ### Files to create
 
-- `modules/security/src/main/kotlin/com/talos/security/policy/AutonomyValidator.kt` (new)
-- `modules/security/src/main/kotlin/com/talos/security/policy/AutonomyLevel.kt` (new — or in `api`)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/AutonomyValidator.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/AutonomyLevel.kt` (new — or in `api`)
 - Tests with golden cases
 
 ### Detailed work
@@ -75,7 +75,7 @@ References: [`../v1-architecture.md`](../v1-architecture.md) §§11, 13, 20, 22.
 
 ### Files to create
 
-- `modules/security/src/main/kotlin/com/talos/security/policy/WorkspaceBoundaryValidator.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/WorkspaceBoundaryValidator.kt` (new)
 - Tests
 
 ### Detailed work
@@ -122,8 +122,8 @@ Pre-execution validator for shell-style tools: matches `args.cmd` (or equivalent
 
 ### Files to create
 
-- `modules/security/src/main/kotlin/com/talos/security/policy/CommandPolicyValidator.kt` (new)
-- `modules/security/src/main/kotlin/com/talos/security/policy/CommandPatternChecker.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/CommandPolicyValidator.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/CommandPatternChecker.kt` (new)
 - Tests with golden footgun samples
 
 ### Detailed work
@@ -181,8 +181,8 @@ Pre-execution validator for shell-style tools: matches `args.cmd` (or equivalent
 
 ### Files to create
 
-- `modules/security/src/main/kotlin/com/talos/security/policy/DomainAllowlistValidator.kt` (new)
-- `modules/security/src/main/kotlin/com/talos/security/policy/SsrfGuard.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/DomainAllowlistValidator.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/SsrfGuard.kt` (new)
 - Tests
 
 ### Detailed work
@@ -235,8 +235,8 @@ Pattern-scan the assistant's generated output (the model's text + tool-call args
 
 ### Files to create
 
-- `modules/security/src/main/kotlin/com/talos/security/policy/PromptInjectionValidator.kt` (new)
-- `modules/security/src/main/kotlin/com/talos/security/policy/PromptInjectionRules.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/PromptInjectionValidator.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/PromptInjectionRules.kt` (new)
 - Tests
 
 ### Detailed work
@@ -284,8 +284,8 @@ Scan tool *output* for known secret patterns. On hit, replace the output with a 
 
 ### Files to create
 
-- `modules/security/src/main/kotlin/com/talos/security/policy/LeakDetector.kt` (new)
-- `modules/security/src/main/kotlin/com/talos/security/policy/SecretPatterns.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/LeakDetector.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/SecretPatterns.kt` (new)
 - Tests
 
 ### Detailed work
@@ -345,7 +345,7 @@ Redact sensitive parameter *names* (not values matched by patterns) before writi
 
 ### Files to create
 
-- `modules/security/src/main/kotlin/com/talos/security/policy/ArgsRedactor.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/ArgsRedactor.kt` (new)
 - Tests
 
 ### Detailed work
@@ -388,20 +388,20 @@ Redact sensitive parameter *names* (not values matched by patterns) before writi
 
 ### Goal
 
-Append-only NDJSON receipts log per `v1-architecture.md` §13. One file per month at `~/.talos/receipts/YYYY-MM.log`. Each record is hash-chained + Ed25519-signed.
+Append-only NDJSON receipts log per `v1-architecture.md` §13. One file per month at `~/.hebe/receipts/YYYY-MM.log`. Each record is hash-chained + Ed25519-signed.
 
 ### Files to create
 
-- `modules/security/src/main/kotlin/com/talos/security/receipts/Receipts.kt` (new)
-- `modules/security/src/main/kotlin/com/talos/security/receipts/Receipt.kt` (new — data class)
-- `modules/security/src/main/kotlin/com/talos/security/receipts/SigningKey.kt` (new — generation + storage)
-- `modules/security/src/main/kotlin/com/talos/security/receipts/CanonicalJson.kt` (new — deterministic serialiser)
+- `modules/security/src/main/kotlin/com/hebe/security/receipts/Receipts.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/receipts/Receipt.kt` (new — data class)
+- `modules/security/src/main/kotlin/com/hebe/security/receipts/SigningKey.kt` (new — generation + storage)
+- `modules/security/src/main/kotlin/com/hebe/security/receipts/CanonicalJson.kt` (new — deterministic serialiser)
 - Tests
 
 ### Detailed work
 
 1. **Signing key**:
-   - On first boot, `SigningKey.bootstrap(secretStore)`: generates an Ed25519 keypair (Bouncy Castle). Stores the **private key** in `secrets.db` under `receipts.signing_key`. The **public key** is stored as plaintext under `~/.talos/receipts/public.key` for verification.
+   - On first boot, `SigningKey.bootstrap(secretStore)`: generates an Ed25519 keypair (Bouncy Castle). Stores the **private key** in `secrets.db` under `receipts.signing_key`. The **public key** is stored as plaintext under `~/.hebe/receipts/public.key` for verification.
    - Subsequent boots: load private key from secrets store.
 
 2. **Receipt** data class (matches arch §13):
@@ -478,16 +478,16 @@ Append-only NDJSON receipts log per `v1-architecture.md` §13. One file per mont
 **Status**: pending  
 **Size**: M  
 **Depends on**: M3.T8  
-**Blocks**: M5.T7 (web verify endpoint), M9.T8 (`talos status` shows receipts)
+**Blocks**: M5.T7 (web verify endpoint), M9.T8 (`hebe status` shows receipts)
 
 ### Goal
 
-`talos memory show receipts/<file> --verify` walks the file, verifies the hash chain + signatures, reports the first divergence.
+`hebe memory show receipts/<file> --verify` walks the file, verifies the hash chain + signatures, reports the first divergence.
 
 ### Files to create
 
-- `modules/security/src/main/kotlin/com/talos/security/receipts/Verifier.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Memory.kt` (edit — wire `show --verify`)
+- `modules/security/src/main/kotlin/com/hebe/security/receipts/Verifier.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Memory.kt` (edit — wire `show --verify`)
 - Tests
 
 ### Detailed work
@@ -503,7 +503,7 @@ Append-only NDJSON receipts log per `v1-architecture.md` §13. One file per mont
 
 2. Walks line-by-line, recomputes `selfHash`, verifies `sig` against the public key, checks `prevHash` against the previous record's `selfHash`. First mismatch returns `Failed`.
 
-3. CLI: `talos memory show receipts/2026-04.log --verify`. Output:
+3. CLI: `hebe memory show receipts/2026-04.log --verify`. Output:
 
    ```
    Verified 12,345 receipts in receipts/2026-04.log
@@ -516,7 +516,7 @@ Append-only NDJSON receipts log per `v1-architecture.md` §13. One file per mont
    FAILED at seq 12,346: prev_hash mismatch (expected sha256:abc, got sha256:def)
    ```
 
-4. Cross-file verification: `talos memory show receipts/ --verify` walks all files in lexicographic order, threading `lastSelfHash` between them.
+4. Cross-file verification: `hebe memory show receipts/ --verify` walks all files in lexicographic order, threading `lastSelfHash` between them.
 
 ### Tests / verification
 
@@ -549,8 +549,8 @@ Register all validators in the right order and run them as the dispatcher's `val
 
 ### Files to create / modify
 
-- `modules/cli-app/src/main/kotlin/com/talos/cli/AppComponents.kt` (new — wires everything; full content lands in M9.T2 or earlier; this task adds the validator wiring)
-- `modules/security/src/main/kotlin/com/talos/security/policy/PolicyChain.kt` (new — composes validators)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/AppComponents.kt` (new — wires everything; full content lands in M9.T2 or earlier; this task adds the validator wiring)
+- `modules/security/src/main/kotlin/com/hebe/security/policy/PolicyChain.kt` (new — composes validators)
 - Tests
 
 ### Detailed work
@@ -588,7 +588,7 @@ Register all validators in the right order and run them as the dispatcher's `val
 
 ---
 
-## M3.T11 — Emergency stop (`talos estop`)
+## M3.T11 — Emergency stop (`hebe estop`)
 
 **Status**: pending  
 **Size**: M  
@@ -597,33 +597,33 @@ Register all validators in the right order and run them as the dispatcher's `val
 
 ### Goal
 
-`talos estop` aborts the current in-flight tool call and any pending approvals. Receipts log records the abort. Process keeps running.
+`hebe estop` aborts the current in-flight tool call and any pending approvals. Receipts log records the abort. Process keeps running.
 
 ### Files to create
 
-- `modules/security/src/main/kotlin/com/talos/security/estop/EmergencyStop.kt` (new)
-- `modules/security/src/main/kotlin/com/talos/security/estop/EstopIpc.kt` (new — Unix-domain socket or named pipe at `~/.talos/.estop.sock`)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Estop.kt` (edit — implement)
+- `modules/security/src/main/kotlin/com/hebe/security/estop/EmergencyStop.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/estop/EstopIpc.kt` (new — Unix-domain socket or named pipe at `~/.hebe/.estop.sock`)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Estop.kt` (edit — implement)
 - Tests
 
 ### Detailed work
 
-1. **Server side** (lives in the running talos process): `EmergencyStop` exposes:
+1. **Server side** (lives in the running hebe process): `EmergencyStop` exposes:
    - `volatile var stopFlag: AtomicBoolean`.
    - `awaitStop(): Channel<Unit>` for `LoopDelegate.checkSignals` to suspend on.
    - On stop: cancel the agent's per-session coroutine scope; mark all `pending_approvals` as `resolved=false, approved=null` with reason "estop"; write a synthetic receipt `{tool:"_estop", ok:false}`.
 
-2. **IPC**: a Unix-domain socket at `~/.talos/.estop.sock`. `talos estop` connects + sends `STOP\n`. Process responds `OK\n`. On Windows, use a named pipe at `\\.\pipe\talos-estop`.
+2. **IPC**: a Unix-domain socket at `~/.hebe/.estop.sock`. `hebe estop` connects + sends `STOP\n`. Process responds `OK\n`. On Windows, use a named pipe at `\\.\pipe\hebe-estop`.
 
 3. CLI:
 
    ```
-   $ talos estop
-   Sending estop to local talos instance…
+   $ hebe estop
+   Sending estop to local hebe instance…
    Acknowledged. In-flight tool calls cancelled. Pending approvals expired.
    ```
 
-4. After estop, the dispatcher continues to accept new turns (the process isn't killed). Optionally: `talos estop --quiesce` puts the agent into "no new turns" mode until `talos estop --resume`.
+4. After estop, the dispatcher continues to accept new turns (the process isn't killed). Optionally: `hebe estop --quiesce` puts the agent into "no new turns" mode until `hebe estop --resume`.
 
 ### Tests / verification
 

@@ -1,10 +1,10 @@
 # Setup Complete
 
-Welcome! This Talos instance has been initialized.
+Welcome! This Hebe instance has been initialized.
 
 ## Next Steps
 
-Run `talos onboard` to complete the setup process. This will:
+Run `hebe onboard` to complete the setup process. This will:
 
 1. Verify your LLM gateway connection
 2. Create your first workspace configuration

@@ -1,8 +1,8 @@
 # M7 — MCP
 
-MCP server exposing talos tools, MCP client consuming external servers, transports (stdio + SSE/WS via Ktor), tool filter groups, per-server credential injection.
+MCP server exposing hebe tools, MCP client consuming external servers, transports (stdio + SSE/WS via Ktor), tool filter groups, per-server credential injection.
 
-**Done when:** a sample stdio MCP server is consumable from a chat turn AND talos's `file_system` tool is callable from Claude Desktop.
+**Done when:** a sample stdio MCP server is consumable from a chat turn AND hebe's `file_system` tool is callable from Claude Desktop.
 
 References: [`../v1-architecture.md`](../v1-architecture.md) §§14, 15.
 
@@ -22,7 +22,7 @@ A hello-world MCP stdio server using the MCP Kotlin SDK; verify the SDK pinned i
 ### Files to create
 
 - `modules/mcp-server/build.gradle.kts` (edit)
-- `modules/mcp-server/src/main/kotlin/com/talos/mcp/McpServer.kt` (new — minimal)
+- `modules/mcp-server/src/main/kotlin/com/hebe/mcp/McpServer.kt` (new — minimal)
 - A throwaway test that connects a programmatic client to the server
 
 ### Detailed work
@@ -66,7 +66,7 @@ A hello-world MCP stdio server using the MCP Kotlin SDK; verify the SDK pinned i
 
 ---
 
-## M7.T2 — MCP server: expose talos tools
+## M7.T2 — MCP server: expose hebe tools
 
 **Status**: pending  
 **Size**: L  
@@ -79,8 +79,8 @@ Bridge `ToolRegistry` → MCP server. Every tool whose `risk` is `Low` or `Mediu
 
 ### Files to create
 
-- `modules/mcp-server/src/main/kotlin/com/talos/mcp/ToolBridge.kt` (new)
-- `modules/mcp-server/src/main/kotlin/com/talos/mcp/ToolFilter.kt` (new)
+- `modules/mcp-server/src/main/kotlin/com/hebe/mcp/ToolBridge.kt` (new)
+- `modules/mcp-server/src/main/kotlin/com/hebe/mcp/ToolFilter.kt` (new)
 - Tests
 
 ### Detailed work
@@ -124,19 +124,19 @@ Bridge `ToolRegistry` → MCP server. Every tool whose `risk` is `Low` or `Mediu
 ### Goal
 
 Two transports:
-- **stdio**: `talos mcp serve` reads from stdin, writes to stdout. Used by Claude Desktop / Cursor configs.
+- **stdio**: `hebe mcp serve` reads from stdin, writes to stdout. Used by Claude Desktop / Cursor configs.
 - **HTTP/SSE/WS**: routes on the gateway at `/mcp/sse` and `/mcp/ws`.
 
 ### Files to create
 
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Mcp.kt` (edit — implement `serve`)
-- `modules/mcp-server/src/main/kotlin/com/talos/mcp/StdioTransport.kt` (new — wraps SDK's stdio transport)
-- `modules/mcp-server/src/main/kotlin/com/talos/mcp/KtorTransports.kt` (new — registers gateway routes)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Mcp.kt` (edit — implement `serve`)
+- `modules/mcp-server/src/main/kotlin/com/hebe/mcp/StdioTransport.kt` (new — wraps SDK's stdio transport)
+- `modules/mcp-server/src/main/kotlin/com/hebe/mcp/KtorTransports.kt` (new — registers gateway routes)
 - Tests
 
 ### Detailed work
 
-1. **Stdio**: `talos mcp serve` boots minimal AppComponents (no channels, no scheduler — just enough for the dispatcher), connects MCP server to stdin/stdout.
+1. **Stdio**: `hebe mcp serve` boots minimal AppComponents (no channels, no scheduler — just enough for the dispatcher), connects MCP server to stdin/stdout.
 
 2. **HTTP routes** (registered when `config.mcp.server.http_bind != ""`):
 
@@ -182,9 +182,9 @@ Read `[[mcp.client.servers]]` from config; for each server, spawn the configured
 ### Files to create
 
 - `modules/tools/mcp-client/build.gradle.kts` (edit)
-- `modules/tools/mcp-client/src/main/kotlin/com/talos/tools/mcp/McpClientManager.kt` (new)
-- `modules/tools/mcp-client/src/main/kotlin/com/talos/tools/mcp/RemoteTool.kt` (new — wraps a remote tool as `Tool`)
-- `modules/tools/mcp-client/src/main/kotlin/com/talos/tools/mcp/Transports.kt` (new — stdio/sse/ws)
+- `modules/tools/mcp-client/src/main/kotlin/com/hebe/tools/mcp/McpClientManager.kt` (new)
+- `modules/tools/mcp-client/src/main/kotlin/com/hebe/tools/mcp/RemoteTool.kt` (new — wraps a remote tool as `Tool`)
+- `modules/tools/mcp-client/src/main/kotlin/com/hebe/tools/mcp/Transports.kt` (new — stdio/sse/ws)
 - Tests
 
 ### Detailed work
@@ -205,7 +205,7 @@ Read `[[mcp.client.servers]]` from config; for each server, spawn the configured
 
 3. `RemoteTool.invoke(args, ctx)` calls `client.callTool(name, args)` and translates the `CallToolResult` into `ToolResult`. Risk inference: external MCP tools default to `Medium` (operator can opt to elevate via per-server config).
 
-4. Lifecycle: graceful shutdown of subprocesses on talos shutdown; restart on disconnect (capped retries); reflect status in `talos doctor`.
+4. Lifecycle: graceful shutdown of subprocesses on hebe shutdown; restart on disconnect (capped retries); reflect status in `hebe doctor`.
 
 ### Tests / verification
 
@@ -237,7 +237,7 @@ Per-server filter so we don't advertise hundreds of remote tools every turn. `Al
 
 ### Files to create
 
-- `modules/tools/mcp-client/src/main/kotlin/com/talos/tools/mcp/McpToolFilter.kt` (new)
+- `modules/tools/mcp-client/src/main/kotlin/com/hebe/tools/mcp/McpToolFilter.kt` (new)
 - Tests
 
 ### Detailed work
@@ -287,7 +287,7 @@ When spawning a stdio MCP server, populate its env from declared secrets so the 
 
 ### Files to create / modify
 
-- `modules/tools/mcp-client/src/main/kotlin/com/talos/tools/mcp/Transports.kt` (edit)
+- `modules/tools/mcp-client/src/main/kotlin/com/hebe/tools/mcp/Transports.kt` (edit)
 - Tests
 
 ### Detailed work
@@ -303,7 +303,7 @@ When spawning a stdio MCP server, populate its env from declared secrets so the 
    ```
 
 2. When spawning, build the env by:
-   - Inheriting the current process env (filtered through the same denylist as `PluginHost.env` — so other secrets in talos's env don't leak to the MCP server).
+   - Inheriting the current process env (filtered through the same denylist as `PluginHost.env` — so other secrets in hebe's env don't leak to the MCP server).
    - Adding entries from `secrets` mapping: `key = name in remote env`, `value = SecretStore.get(value)`.
 
 3. Logging: redact all secret values in any startup logs (`[REDACTED]`).

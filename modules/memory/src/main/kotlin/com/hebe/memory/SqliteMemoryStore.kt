@@ -1,0 +1,177 @@
+package com.hebe.memory
+
+import com.hebe.api.ChatRole
+import com.hebe.api.ConversationMessage
+import com.hebe.api.MemoryCategory
+import com.hebe.api.MemoryHit
+import com.hebe.api.MemoryScope
+import com.hebe.api.MemorySnapshot
+import com.hebe.api.MemoryStore
+import com.hebe.api.Observer
+import com.hebe.api.ObserverEvent
+import com.hebe.api.HebeException
+import com.hebe.memory.db.Db
+import com.hebe.memory.embeddings.EmbeddingProvider
+import com.hebe.memory.hygiene.HygieneResult
+import com.hebe.memory.hygiene.HygieneScanner
+import com.hebe.memory.indexer.Indexer
+import com.hebe.memory.search.Searcher
+import com.hebe.memory.workspace.WorkspaceFs
+import com.hebe.memory.workspace.WorkspacePath
+import java.util.UUID
+import kotlin.time.Instant
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
+
+class SqliteMemoryStore(
+    private val db: Db,
+    private val workspaceFs: WorkspaceFs,
+    private val embeddings: EmbeddingProvider,
+    private val hygieneScanner: HygieneScanner,
+    observer: Observer?,
+) : MemoryStore {
+    companion object {
+        private const val PARAM_CONV_ID = 1
+        private const val PARAM_MSG_ID = 2
+        private const val PARAM_ROLE = 3
+        private const val PARAM_CONTENT = 4
+        private const val PARAM_TOOL_CALLS = 5
+        private const val PARAM_TS = 6
+    }
+
+    private val indexer = Indexer(db)
+    private val searcher = Searcher(db, embeddings)
+    private val systemPromptAssembler = SystemPromptAssembler(workspaceFs)
+    private val mutex = Mutex()
+
+    init {
+        observer?.event(ObserverEvent.MemoryDbReady(null, 0))
+    }
+
+    override suspend fun appendMessage(
+        conversationId: String,
+        msg: ConversationMessage,
+    ) {
+        mutex.withLock {
+            withContext(Dispatchers.IO) {
+                db.dataSource.connection.use { conn ->
+                    conn.prepareStatement("INSERT INTO conversations(id) VALUES (?)").use { ps ->
+                        ps.setString(PARAM_CONV_ID, conversationId)
+                        ps.executeUpdate()
+                    }
+                    conn
+                        .prepareStatement(
+                            """
+                            INSERT INTO messages(conversation_id, id, role, content, tool_calls, ts)
+                            VALUES (?, ?, ?, ?, ?, ?)
+                            """.trimIndent(),
+                        ).use { ps ->
+                            ps.setString(PARAM_CONV_ID, conversationId)
+                            ps.setString(PARAM_MSG_ID, msg.id.toString())
+                            ps.setString(PARAM_ROLE, msg.role.name)
+                            ps.setString(PARAM_CONTENT, msg.content)
+                            ps.setString(PARAM_TOOL_CALLS, "[]")
+                            ps.setLong(PARAM_TS, msg.ts.toEpochMilliseconds())
+                            ps.executeUpdate()
+                        }
+                }
+            }
+        }
+    }
+
+    override suspend fun loadContext(
+        conversationId: String,
+        limit: Int,
+    ): List<ConversationMessage> =
+        mutex.withLock {
+            withContext(Dispatchers.IO) {
+                val msgs = mutableListOf<ConversationMessage>()
+                db.dataSource.connection.use { conn ->
+                    conn
+                        .prepareStatement(
+                            """
+                            SELECT id, role, content, ts FROM messages
+                            WHERE conversation_id = ?
+                            ORDER BY ts DESC LIMIT ?
+                            """.trimIndent(),
+                        ).use { ps ->
+                            ps.setString(PARAM_CONV_ID, conversationId)
+                            ps.setInt(2, limit)
+                            val rs = ps.executeQuery()
+                            while (rs.next()) {
+                                msgs.add(
+                                    ConversationMessage(
+                                        id = UUID.fromString(rs.getString(PARAM_MSG_ID)),
+                                        role = ChatRole.valueOf(rs.getString(PARAM_ROLE)),
+                                        content = rs.getString(PARAM_CONTENT),
+                                        toolCalls = emptyList(),
+                                        ts = Instant.fromEpochMilliseconds(rs.getLong(PARAM_TS)),
+                                    ),
+                                )
+                            }
+                        }
+                }
+                msgs.reversed()
+            }
+        }
+
+    override suspend fun search(
+        query: String,
+        k: Int,
+        scope: MemoryScope,
+        categories: Set<MemoryCategory>?,
+    ): List<MemoryHit> = searcher.search(query, k, scope, categories)
+
+    override suspend fun appendDoc(
+        path: String,
+        content: String,
+        scope: MemoryScope,
+        category: MemoryCategory,
+    ) {
+        val verdict = hygieneScanner.scan(content)
+        when (verdict) {
+            is HygieneResult.Reject -> throw HebeException.Memory("rejected: ${verdict.findings.first().rule}")
+            is HygieneResult.Warn -> {}
+            is HygieneResult.Clean -> {}
+        }
+        val wp = WorkspacePath(path)
+        indexer.indexDoc(wp, content, scope, category)
+        workspaceFs.write(wp, content)
+    }
+
+    override suspend fun readDoc(path: String): String? = workspaceFs.read(WorkspacePath(path))
+
+    override suspend fun listDocs(prefix: String): List<String> {
+        val wp = if (prefix.isEmpty()) WorkspacePath("") else WorkspacePath(prefix)
+        return workspaceFs.list(wp).map { it.value }
+    }
+
+    override suspend fun systemPrompt(): String = systemPromptAssembler.assemble()
+
+    override suspend fun snapshot(): MemorySnapshot =
+        withContext(Dispatchers.IO) {
+            db.dataSource.connection.use { conn ->
+                val conversations =
+                    conn.createStatement().use { st ->
+                        val rs = st.executeQuery("SELECT COUNT(*) FROM conversations")
+                        rs.next()
+                        rs.getInt(1)
+                    }
+                val docs =
+                    conn.createStatement().use { st ->
+                        val rs = st.executeQuery("SELECT COUNT(*) FROM memory_docs")
+                        rs.next()
+                        rs.getInt(1)
+                    }
+                val chunks =
+                    conn.createStatement().use { st ->
+                        val rs = st.executeQuery("SELECT COUNT(*) FROM memory_chunks")
+                        rs.next()
+                        rs.getInt(1)
+                    }
+                MemorySnapshot(conversations, docs, chunks)
+            }
+        }
+}

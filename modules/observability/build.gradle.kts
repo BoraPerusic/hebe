@@ -1,5 +1,5 @@
 plugins {
-    id("talos.library")
+    id("hebe.library")
     alias(libs.plugins.kotlin.serialization)
 }
 

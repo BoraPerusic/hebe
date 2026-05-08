@@ -1,4 +1,4 @@
-# talos — v1 task list
+# hebe — v1 task list
 
 Ordered, dependency-aware task breakdown for v1. Each task is small enough that one engineer should be able to land it in 0.5–3 days. The PF4J spike is task **M6.T1**, not a prelude.
 
@@ -22,12 +22,12 @@ Companion docs: [`v1-specs.md`](v1-specs.md) (scope) and [`v1-architecture.md`](
 | M0.T3 | Detekt + ktlint baseline | M0.T1 | S | `./gradlew detekt ktlintCheck` clean on empty project. |
 | M0.T4 | CI pipeline (GitHub Actions) | M0.T2, M0.T3 | M | PR CI: `./gradlew check`; main CI: same + `./gradlew shadowJar`; cache enabled. |
 | M0.T5 | `api` module — Kotlin types from `v1-architecture.md` §3 | M0.T1 | L | All interfaces compile; `kotlinx-serialization` annotations on data classes; no other deps. |
-| M0.T6 | `plugin-api` module — `TalosPlugin`, `PluginHost`, `Capability`, `Permission`, `SecretHandle`, `GatedHttpClient` | M0.T5 | M | Compiles with only `api` + `pf4j` as deps; `TalosPlugin` extends `org.pf4j.Plugin`. |
+| M0.T6 | `plugin-api` module — `HebePlugin`, `PluginHost`, `Capability`, `Permission`, `SecretHandle`, `GatedHttpClient` | M0.T5 | M | Compiles with only `api` + `pf4j` as deps; `HebePlugin` extends `org.pf4j.Plugin`. |
 | M0.T7 | `observability` module — kotlin-logging + logback JSON encoder + `Observer` impl | M0.T5 | M | `LogbackObserver` produces structured JSON with required fields (§21 of arch); ring buffer for `doctor`. |
-| M0.T8 | `config` module — TOML schema + loader + validation diagnostics | M0.T5 | L | `TalosConfig.load(path) → Result<TalosConfig, ConfigErrors>`; bad config produces row/col-pinpointed errors. |
+| M0.T8 | `config` module — TOML schema + loader + validation diagnostics | M0.T5 | L | `HebeConfig.load(path) → Result<HebeConfig, ConfigErrors>`; bad config produces row/col-pinpointed errors. |
 | M0.T9 | `config` — secrets store (AES-256-GCM + OS keychain + passphrase fallback) | M0.T8 | L | `SecretStore.put/get/delete/list` round-trips on macOS, Linux (secret-service or passphrase fallback), Windows. Master key rotation deferred. |
 | M0.T10 | `detekt-rules` — custom rule "no direct mutation outside `// dispatch-exempt:` lines" | M0.T1, M0.T3 | M | Rule fires on a synthetic positive test; passes on `// dispatch-exempt: <reason>`-annotated calls. |
-| M0.T11 | Minimum-viable `cli-app` skeleton (clikt-based subcommand parser) | M0.T1 | S | `./talos --help` lists all v1 subcommands as stubs; each prints "not yet implemented". |
+| M0.T11 | Minimum-viable `cli-app` skeleton (clikt-based subcommand parser) | M0.T1 | S | `./hebe --help` lists all v1 subcommands as stubs; each prints "not yet implemented". |
 
 **M0 done when:** project builds end-to-end, CI is green, `api` + `plugin-api` + `config` + `observability` are usable from other modules.
 
@@ -40,7 +40,7 @@ Companion docs: [`v1-specs.md`](v1-specs.md) (scope) and [`v1-architecture.md`](
 | M1.T1 | SQLite open + Flyway runner | M0.T8 | M | `Db.open(path)` runs migrations V1–V5 (§5 of arch); idempotent on re-open. |
 | M1.T2 | Migration files V1–V5 | M1.T1 | M | DDL from §5 verbatim; `./gradlew test` boots a temp DB with all tables. |
 | M1.T3 | sqlite-vec extension loader | M1.T1 | M | Native extension loaded via JDBC URL on macOS+Linux; vector inserts/selects work in a smoke test. |
-| M1.T4 | `WorkspaceFs` API (read/write/list/append) confined to `~/.talos/workspace/` | M0.T8 | M | Bounds violations throw `TalosException.Security`; `read/write` round-trip; markdown autoinference. |
+| M1.T4 | `WorkspaceFs` API (read/write/list/append) confined to `~/.hebe/workspace/` | M0.T8 | M | Bounds violations throw `HebeException.Security`; `read/write` round-trip; markdown autoinference. |
 | M1.T5 | Workspace seeding (BOOTSTRAP/IDENTITY/MEMORY/HEARTBEAT/README) | M1.T4 | S | First-run creates the layout from §6 of arch; idempotent. |
 | M1.T6 | Chunker (800 words, 15% overlap, min 50) | M1.T4 | M | Pure function with property tests; deterministic output. |
 | M1.T7 | `EmbeddingProvider` trait + mock + OpenAI-compat impl | M1.T1 | M | Mock returns deterministic vectors; OpenAI-compat impl reads `embedding_model` from config; unit tests use mock. |
@@ -74,7 +74,7 @@ Companion docs: [`v1-specs.md`](v1-specs.md) (scope) and [`v1-architecture.md`](
 | M2.T10 | Preemptive history pruning | M2.T9 | S | Trim runs before context overflow; never produces an over-budget request. |
 | M2.T11 | `ChatDelegate` — implements `LoopDelegate` | M2.T3, M2.T6, M2.T7, M2.T8 | L | Drives `runAgenticLoop`; produces `LoopOutcome` variants correctly in mocked tests. |
 | M2.T12 | `JobDelegate` minimal (used by scheduler later) | M2.T11 | M | Same loop, no draft updates, sequential tools. |
-| M2.T13 | `TalosAgent` facade with `handleMessage(IncomingMessage): HandleOutcome` | M2.T11 | M | All `HandleOutcome` variants wired; `Pending` distinguishable from `NoResponse`. |
+| M2.T13 | `HebeAgent` facade with `handleMessage(IncomingMessage): HandleOutcome` | M2.T11 | M | All `HandleOutcome` variants wired; `Pending` distinguishable from `NoResponse`. |
 | M2.T14 | Hooks: `BeforeInbound`, `BeforeToolCall`, `BeforeOutbound`, `OnSessionStart/End` | M2.T13 | M | Fail-open semantics; tested. |
 | M2.T15 | Auth-mode interception (credential entry never reaches transcript) | M2.T4, M2.T13 | M | Auth-mode input goes to `SecretStore.put`; nothing in `messages`. |
 
@@ -93,10 +93,10 @@ Companion docs: [`v1-specs.md`](v1-specs.md) (scope) and [`v1-architecture.md`](
 | M3.T5 | Prompt-injection guard | M0.T7 | M | Pattern set; cached per turn; severity report. |
 | M3.T6 | Leak detector (regex set for known secret formats) | M0.T7 | M | Detects: AWS keys, OpenAI keys, GitHub PATs, Stripe keys, generic high-entropy tokens. |
 | M3.T7 | Sensitive-param redaction | M0.T7, M2.T6 | S | `args_redacted` masks values for known key names; receipts + UI use redacted form. |
-| M3.T8 | Ed25519 receipts log writer (chain + sig) | M1.T2, M0.T9 | L | NDJSON file at `~/.talos/receipts/YYYY-MM.log` per §13 of arch; signing key stored in `secrets.db`. |
-| M3.T9 | Receipts verifier (`talos memory show receipts/<file> --verify`) | M3.T8 | M | Walks the file, checks chain + signatures; reports first divergence. |
+| M3.T8 | Ed25519 receipts log writer (chain + sig) | M1.T2, M0.T9 | L | NDJSON file at `~/.hebe/receipts/YYYY-MM.log` per §13 of arch; signing key stored in `secrets.db`. |
+| M3.T9 | Receipts verifier (`hebe memory show receipts/<file> --verify`) | M3.T8 | M | Walks the file, checks chain + signatures; reports first divergence. |
 | M3.T10 | Wire policy chain into `ToolDispatcher` | M3.T1–M3.T6, M2.T6 | M | All checks in §22 of arch run in order; tested via golden cases. |
-| M3.T11 | Emergency stop (`talos estop` IPC + dispatcher honors it) | M2.T13 | M | Stop fires inside an in-flight tool call; receipts log records `{aborted: true}`. |
+| M3.T11 | Emergency stop (`hebe estop` IPC + dispatcher honors it) | M2.T13 | M | Stop fires inside an in-flight tool call; receipts log records `{aborted: true}`. |
 
 **M3 done when:** running a tool that violates each policy returns a structured `ToolResult.Err`; a known-malicious LLM output is blocked; receipts verify clean on a 100-call sample.
 
@@ -122,7 +122,7 @@ Each tool is a small task + tests + risk-tagging + sensitive-param config.
 | M4.T12 | `schedule` (creates routine entries) | M1.T2 | S | Inserts into `routines`; cron expression validated on insert. |
 | M4.T13 | `job_create` / `job_status` / `job_cancel` | M1.T2 | M | CRUD against `jobs`; cancellation cooperative. |
 
-**M4 done when:** every v1 tool has a unit test, a receipts entry on success, a `ToolResult.Err` on policy violation, and `talos tool list` enumerates them with their risk.
+**M4 done when:** every v1 tool has a unit test, a receipts entry on success, a `ToolResult.Err` on policy violation, and `hebe tool list` enumerates them with their risk.
 
 ---
 
@@ -139,7 +139,7 @@ Each tool is a small task + tests + risk-tagging + sensitive-param config.
 | M5.T7 | Web receipts viewer (`/api/receipts`, `/api/receipts/verify`) | M5.T3, M3.T8 | M | Tabular view of recent receipts; verify button; per-row "show full args". |
 | M5.T8 | Telegram channel — long-poll + draft updates + operator gate | M5.T1 | L | Bot token from secrets; rejects non-operator senders at adapter; `editMessageText` throttled. |
 | M5.T9 | Telegram webhook variant | M5.T8, M5.T3 | M | Webhook payload routed to `ChannelManager`; signature validation. |
-| M5.T10 | Channel `healthCheck()` exposed in `/api/status` and `talos doctor` | M5.T2, M5.T5, M5.T8 | S | Each channel reports `Up | Degraded | Down`. |
+| M5.T10 | Channel `healthCheck()` exposed in `/api/status` and `hebe doctor` | M5.T2, M5.T5, M5.T8 | S | Each channel reports `Up | Degraded | Down`. |
 
 **M5 done when:** a chat works end-to-end through CLI + web + Telegram; an approval prompt round-trips on each.
 
@@ -151,17 +151,17 @@ The PF4J spike is the first task here. It's deliberately scoped to "load a hello
 
 | ID | Title | Deps | Size | Acceptance |
 |---|---|---|---|---|
-| **M6.T1** | **PF4J spike — hello-world plugin loaded from a local JAR** | **M0.T6** | **L** | **A `plugin-template/`-derived hello-world plugin contributes a `say_hello` Tool. `talos plugin install <local-path>` loads it; calling `say_hello` from a chat returns the expected output. No manifest validation, no signature, no ACR yet — just the loader path.** |
-| M6.T2 | `PluginManagerWrapper` (PF4J `DefaultPluginManager` subclass + classloader rules) | M6.T1 | M | Plugin classloader exposes `api` + `plugin-api` only (verified by negative test: plugin importing `com.talos.core.*` fails to load). |
+| **M6.T1** | **PF4J spike — hello-world plugin loaded from a local JAR** | **M0.T6** | **L** | **A `plugin-template/`-derived hello-world plugin contributes a `say_hello` Tool. `hebe plugin install <local-path>` loads it; calling `say_hello` from a chat returns the expected output. No manifest validation, no signature, no ACR yet — just the loader path.** |
+| M6.T2 | `PluginManagerWrapper` (PF4J `DefaultPluginManager` subclass + classloader rules) | M6.T1 | M | Plugin classloader exposes `api` + `plugin-api` only (verified by negative test: plugin importing `com.hebe.core.*` fails to load). |
 | M6.T3 | `plugin.toml` parser + manifest model (`PluginManifest`) | M0.T8, M6.T2 | M | Errors point to row/col; missing required fields rejected. |
 | M6.T4 | `PluginHost` impl with capability gates (`http_client`, `env_read`, `secrets:<name>`) | M6.T3, M3.T4 | L | Calling `host.http()` without `http_client` throws `PluginCapabilityException`; allowlist enforced. |
 | M6.T5 | Ed25519 signature verification (`signature_mode = optional/required/disabled`) | M0.T9, M6.T3 | M | Signed plugin loads under `required`; unsigned + `required` rejected; unsigned + `optional` warns + loads. |
-| M6.T6 | ABI compatibility check (`talos_api_version`) | M6.T3 | S | Incompatible plugin rejected with a clear diagnostic. |
+| M6.T6 | ABI compatibility check (`hebe_api_version`) | M6.T3 | S | Incompatible plugin rejected with a clear diagnostic. |
 | M6.T7 | Plugin lifecycle wiring into `ToolRegistry` | M6.T2, M2.T6 | M | `plugin.tools(host)` results registered as `<plugin>:<tool>`; deregistered on stop. |
 | M6.T8 | OCI client (ORAS Java SDK) wrapper | M0.T9 | L | `OciClient.pull(ref) → tarball at cache path`; auth via `DefaultAzureCredential` chain; non-Azure registries via docker config / ORAS auth file. |
-| M6.T9 | `talos plugin install <oci-ref>` flow (pull → verify → extract → load) | M6.T7, M6.T8 | M | Round-trip: publish hello-world to a local OCI registry (via `oras push`), then install via talos; tool callable. |
-| M6.T10 | `talos plugin install <local-path>` (sideload) | M6.T2 | S | Used by dev workflow; mirrors the OCI path's last steps. |
-| M6.T11 | `talos plugin list` / `talos plugin remove` | M6.T7 | M | List shows status (loaded/error) + capabilities; remove stops + deletes; install records persisted in `settings`. |
+| M6.T9 | `hebe plugin install <oci-ref>` flow (pull → verify → extract → load) | M6.T7, M6.T8 | M | Round-trip: publish hello-world to a local OCI registry (via `oras push`), then install via hebe; tool callable. |
+| M6.T10 | `hebe plugin install <local-path>` (sideload) | M6.T2 | S | Used by dev workflow; mirrors the OCI path's last steps. |
+| M6.T11 | `hebe plugin list` / `hebe plugin remove` | M6.T7 | M | List shows status (loaded/error) + capabilities; remove stops + deletes; install records persisted in `settings`. |
 | M6.T12 | `auto_pull` on boot | M6.T9 | S | Configured plugins pulled at startup if missing; failures non-fatal. |
 | M6.T13 | `plugin-template/` Gradle template repo | M6.T1, M6.T3 | M | One-command publish via `oras push` Gradle task; sample Tool + manifest + properties + tests. |
 
@@ -174,13 +174,13 @@ The PF4J spike is the first task here. It's deliberately scoped to "load a hello
 | ID | Title | Deps | Size | Acceptance |
 |---|---|---|---|---|
 | M7.T1 | MCP Kotlin SDK integration baseline | M0.T2 | M | Hello-world stdio server compiles; spec-compliant initialise/list_tools/call_tool. |
-| M7.T2 | `mcp-server` — expose talos tools as MCP server | M2.T6, M7.T1 | L | All `Low|Medium`-risk tools advertised; `High` gated by `expose_high_risk` flag. |
+| M7.T2 | `mcp-server` — expose hebe tools as MCP server | M2.T6, M7.T1 | L | All `Low|Medium`-risk tools advertised; `High` gated by `expose_high_risk` flag. |
 | M7.T3 | `mcp-server` transports — stdio (subcommand) + SSE/WS via Ktor | M5.T3, M7.T2 | M | Claude Desktop / Cursor can call `file_system_read` over stdio. |
 | M7.T4 | `tools/mcp-client` — consume external MCP servers | M7.T1, M2.T6 | L | Tools imported with `mcp_<server>_<tool>` names; spawn via configured transport. |
 | M7.T5 | Tool filter groups (`Always` + `Dynamic` + keywords) | M7.T4 | M | Per-server filter applied per turn before context build. |
 | M7.T6 | Per-server credential injection | M7.T4, M0.T9 | M | Stdio servers spawned with declared env populated from secrets store. |
 
-**M7 done when:** a sample stdio MCP server (e.g. `@modelcontextprotocol/server-filesystem`) is consumable from a chat turn AND talos's `file_system` tool is callable from Claude Desktop.
+**M7 done when:** a sample stdio MCP server (e.g. `@modelcontextprotocol/server-filesystem`) is consumable from a chat turn AND hebe's `file_system` tool is callable from Claude Desktop.
 
 ---
 
@@ -206,16 +206,16 @@ The PF4J spike is the first task here. It's deliberately scoped to "load a hello
 
 | ID | Title | Deps | Size | Acceptance |
 |---|---|---|---|---|
-| M9.T1 | `talos doctor` — config / LLM / channels / keychain / plugins / sandbox detect | M5.T10, M6.T11 | M | Each check returns `Pass | Warn | Fail` with a remediation hint. |
-| M9.T2 | `talos service install/start/stop/uninstall` | M0.T11 | M | systemd unit / launchctl plist / Windows-Service definition generated and installed. |
+| M9.T1 | `hebe doctor` — config / LLM / channels / keychain / plugins / sandbox detect | M5.T10, M6.T11 | M | Each check returns `Pass | Warn | Fail` with a remediation hint. |
+| M9.T2 | `hebe service install/start/stop/uninstall` | M0.T11 | M | systemd unit / launchctl plist / Windows-Service definition generated and installed. |
 | M9.T3 | Daemon mode + PID file + graceful shutdown | M0.T11 | S | SIGTERM drains turns within a deadline, then exits 0. |
-| M9.T4 | Onboarding wizard (`talos onboard`) | M0.T8, M5.T8 | L | Walks through LLM endpoint + Telegram + admin password; generates `config.toml` + secrets; deletes `BOOTSTRAP.md`. |
+| M9.T4 | Onboarding wizard (`hebe onboard`) | M0.T8, M5.T8 | L | Walks through LLM endpoint + Telegram + admin password; generates `config.toml` + secrets; deletes `BOOTSTRAP.md`. |
 | M9.T5 | OTel exporter wiring + spans for `dispatch.<tool>`, `memory.search`, `plugin.start`, `channel.reply` | M0.T7 | M | Spans visible against an OTLP collector. |
-| M9.T6 | Fat-JAR build via Gradle Shadow + `./talos` shell wrapper | M0.T1 | S | `./gradlew shadowJar` produces a single jar; wrapper runs it. |
-| M9.T7 | `talos completion bash/zsh/fish` | M0.T11 | S | Shell completion for subcommands. |
-| M9.T8 | `talos status --recent` | M3.T8 | S | Prints recent receipts, last LLM call, channel health. |
+| M9.T6 | Fat-JAR build via Gradle Shadow + `./hebe` shell wrapper | M0.T1 | S | `./gradlew shadowJar` produces a single jar; wrapper runs it. |
+| M9.T7 | `hebe completion bash/zsh/fish` | M0.T11 | S | Shell completion for subcommands. |
+| M9.T8 | `hebe status --recent` | M3.T8 | S | Prints recent receipts, last LLM call, channel health. |
 
-**M9 done when:** a fresh user runs `talos onboard` → `talos service install` → talos comes up under systemd and stays up across a host reboot.
+**M9 done when:** a fresh user runs `hebe onboard` → `hebe service install` → hebe comes up under systemd and stays up across a host reboot.
 
 ---
 
@@ -264,7 +264,7 @@ A reasonable execution order if a single engineer is driving:
 3. **M3** layers on top of M2's dispatcher.
 4. **M4 (built-in tools)** — most can land independently in any order; `shell` and `kubectl` last because they're the highest-blast-radius.
 5. **M6.T1 (PF4J spike)** can start as soon as M0 is done; finish the spike before the rest of M6.
-6. **M5 (channels)** — CLI first, then web, then Telegram. Each picks up `TalosAgent` from M2.
+6. **M5 (channels)** — CLI first, then web, then Telegram. Each picks up `HebeAgent` from M2.
 7. **M7 (MCP)** can start after M2 + M6.T1; client side benefits from having M4 tools to expose.
 8. **M8 (scheduler)** after M2 + M4.
 9. **M9 (operations)** runs alongside M5–M8 as features stabilise.
@@ -280,7 +280,7 @@ If we're behind schedule, the recommended cut order (least painful first):
 2. M4.T10 (`kubectl`) — defer if no pressing use case.
 3. M5.T9 (Telegram webhook variant) — keep long-poll only.
 4. M7.T3 SSE/WS (keep stdio).
-5. M9.T4 onboarding wizard → minimal `talos init` that writes a starter `config.toml`.
+5. M9.T4 onboarding wizard → minimal `hebe init` that writes a starter `config.toml`.
 6. M10.T7 soak shortened from 7 days to 48 hours.
 7. M6.T8/T9 (OCI/ACR) — keep sideload only; defer ACR pull to v1.1.
 

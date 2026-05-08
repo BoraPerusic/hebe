@@ -22,8 +22,8 @@ References: [`../v1-architecture.md`](../v1-architecture.md) §§5, 6, 13.
 ### Files to create
 
 - `modules/memory/build.gradle.kts` (edit)
-- `modules/memory/src/main/kotlin/com/talos/memory/db/Db.kt` (new)
-- `modules/memory/src/main/kotlin/com/talos/memory/db/Migrations.kt` (new — wraps Flyway)
+- `modules/memory/src/main/kotlin/com/hebe/memory/db/Db.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/db/Migrations.kt` (new — wraps Flyway)
 - `modules/memory/src/main/resources/db/migration/.gitkeep` (new — V*.sql land here in M1.T2)
 - Tests against an in-memory SQLite
 
@@ -194,7 +194,7 @@ Load the sqlite-vec native extension before any migration or query that touches 
 ### Files to create
 
 - `modules/memory/build.gradle.kts` (edit — add sqlite-vec native dep)
-- `modules/memory/src/main/kotlin/com/talos/memory/db/SqliteVecExtension.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/db/SqliteVecExtension.kt` (new)
 - `modules/memory/src/main/resources/native/sqlite-vec/` (new — binaries placed here at build time)
 - Tests that insert + query a vec row
 
@@ -257,13 +257,13 @@ Load the sqlite-vec native extension before any migration or query that touches 
 
 ### Goal
 
-A type-safe filesystem façade for the workspace. All paths are validated against the workspace root; any attempt to escape (`..`, absolute paths, symlinks pointing outside) throws `TalosException.Security`.
+A type-safe filesystem façade for the workspace. All paths are validated against the workspace root; any attempt to escape (`..`, absolute paths, symlinks pointing outside) throws `HebeException.Security`.
 
 ### Files to create
 
-- `modules/memory/src/main/kotlin/com/talos/memory/workspace/WorkspaceFs.kt` (new)
-- `modules/memory/src/main/kotlin/com/talos/memory/workspace/WorkspacePath.kt` (new — value class)
-- `modules/memory/src/main/kotlin/com/talos/memory/workspace/MarkdownInferrer.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/workspace/WorkspaceFs.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/workspace/WorkspacePath.kt` (new — value class)
+- `modules/memory/src/main/kotlin/com/hebe/memory/workspace/MarkdownInferrer.kt` (new)
 - Tests: golden cases for both happy and traversal-attack paths
 
 ### Detailed work
@@ -292,7 +292,7 @@ A type-safe filesystem façade for the workspace. All paths are validated agains
 
 3. Resolution:
    - Compute `resolved = root.resolve(path.value).toRealPath()`.
-   - Validate `resolved.startsWith(root.toRealPath())`. If not, throw `TalosException.Security("escape attempt: $path")`.
+   - Validate `resolved.startsWith(root.toRealPath())`. If not, throw `HebeException.Security("escape attempt: $path")`.
    - Symlink-following is the default, but the start-with check on the *real* path catches symlink escapes.
 
 4. `write` uses atomic-write semantics: write to `path.tmp` then `Files.move` with `ATOMIC_MOVE` + `REPLACE_EXISTING`. Mitigates "kill -9 mid-write" workspace corruption (an NFR in `v1-specs.md` §4).
@@ -303,7 +303,7 @@ A type-safe filesystem façade for the workspace. All paths are validated agains
 
 - Happy path: `write(MEMORY.md, …) → read(MEMORY.md)` round-trip.
 - Traversal: `read(WorkspacePath("../etc/passwd"))` (assuming we let it past the constructor — we don't) is impossible; the constructor `require(...)` rejects.
-- Symlink escape: create a symlink `~/.talos/workspace/escape -> /etc`; `read(WorkspacePath("escape/passwd"))` throws `TalosException.Security`.
+- Symlink escape: create a symlink `~/.hebe/workspace/escape -> /etc`; `read(WorkspacePath("escape/passwd"))` throws `HebeException.Security`.
 - Atomic write: simulate a crash during write (drop the move step) and assert the original file is intact.
 
 ### Acceptance criteria
@@ -316,7 +316,7 @@ A type-safe filesystem façade for the workspace. All paths are validated agains
 ### Pitfalls
 
 - `toRealPath()` resolves symlinks but throws if the file doesn't exist; for `write` you must `toRealPath()` the parent directory and join the leaf manually.
-- On macOS, `~/.talos/workspace` is often under `/Users/<name>/...` which is also a symlink target on some configurations. Test on both APFS and case-insensitive HFS.
+- On macOS, `~/.hebe/workspace` is often under `/Users/<name>/...` which is also a symlink target on some configurations. Test on both APFS and case-insensitive HFS.
 
 ### References
 
@@ -337,7 +337,7 @@ On first run, populate the workspace with the canonical layout from `v1-architec
 
 ### Files to create
 
-- `modules/memory/src/main/kotlin/com/talos/memory/workspace/WorkspaceSeeder.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/workspace/WorkspaceSeeder.kt` (new)
 - `modules/memory/src/main/resources/workspace-seeds/README.md` (new)
 - `modules/memory/src/main/resources/workspace-seeds/IDENTITY.md` (new)
 - `modules/memory/src/main/resources/workspace-seeds/MEMORY.md` (new — empty/templated)
@@ -351,7 +351,7 @@ On first run, populate the workspace with the canonical layout from `v1-architec
    - For each seed file in `resources/workspace-seeds/`, `if (!fs.exists(path)) fs.write(path, seedContent)`.
    - Create empty directories: `daily/`, `context/`, `projects/`, `.system/settings/`.
 
-2. `BOOTSTRAP.md` content suggests the user run `talos onboard` and lists what onboarding does. After onboarding completes (M9.T4), it deletes this file.
+2. `BOOTSTRAP.md` content suggests the user run `hebe onboard` and lists what onboarding does. After onboarding completes (M9.T4), it deletes this file.
 
 3. `IDENTITY.md` template: a paragraph or two; user edits to set the agent's persona.
 
@@ -390,8 +390,8 @@ A pure function that splits text into chunks suitable for embedding. Property-te
 
 ### Files to create
 
-- `modules/memory/src/main/kotlin/com/talos/memory/chunker/Chunker.kt` (new)
-- `modules/memory/src/main/kotlin/com/talos/memory/chunker/ChunkerConfig.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/chunker/Chunker.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/chunker/ChunkerConfig.kt` (new)
 - Tests with property + golden cases
 
 ### Detailed work
@@ -454,9 +454,9 @@ Pluggable embedding provider. Mock returns deterministic vectors for tests. Open
 
 ### Files to create
 
-- `modules/memory/src/main/kotlin/com/talos/memory/embeddings/EmbeddingProvider.kt` (new — interface)
-- `modules/memory/src/main/kotlin/com/talos/memory/embeddings/MockEmbeddingProvider.kt` (new)
-- `modules/memory/src/main/kotlin/com/talos/memory/embeddings/OpenAiCompatEmbeddingProvider.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/embeddings/EmbeddingProvider.kt` (new — interface)
+- `modules/memory/src/main/kotlin/com/hebe/memory/embeddings/MockEmbeddingProvider.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/embeddings/OpenAiCompatEmbeddingProvider.kt` (new)
 - Tests using the mock + a recorded fixture for OpenAI-compat
 
 ### Detailed work
@@ -516,7 +516,7 @@ Wrap any `EmbeddingProvider` with an LRU cache to avoid re-embedding identical c
 
 ### Files to create
 
-- `modules/memory/src/main/kotlin/com/talos/memory/embeddings/CachedEmbeddingProvider.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/embeddings/CachedEmbeddingProvider.kt` (new)
 - Tests covering hit/miss/eviction
 
 ### Detailed work
@@ -559,8 +559,8 @@ Given a workspace doc, write its chunks into `memory_chunks` (FTS auto-syncs via
 
 ### Files to create
 
-- `modules/memory/src/main/kotlin/com/talos/memory/indexer/Indexer.kt` (new)
-- `modules/memory/src/main/kotlin/com/talos/memory/indexer/IndexerOps.kt` (new — SQL bits)
+- `modules/memory/src/main/kotlin/com/hebe/memory/indexer/Indexer.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/indexer/IndexerOps.kt` (new — SQL bits)
 - Tests writing + reading back
 
 ### Detailed work
@@ -618,9 +618,9 @@ Implement `MemoryStore.search(query, k)` per `v1-architecture.md` §13 — FTS5 
 
 ### Files to create
 
-- `modules/memory/src/main/kotlin/com/talos/memory/search/Searcher.kt` (new)
-- `modules/memory/src/main/kotlin/com/talos/memory/search/Rrf.kt` (new — pure function)
-- `modules/memory/src/main/kotlin/com/talos/memory/SqliteMemoryStore.kt` (edit if exists, else new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/search/Searcher.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/search/Rrf.kt` (new — pure function)
+- `modules/memory/src/main/kotlin/com/hebe/memory/SqliteMemoryStore.kt` (edit if exists, else new)
 - Tests
 
 ### Detailed work
@@ -675,7 +675,7 @@ Implement `MemoryStore.search(query, k)` per `v1-architecture.md` §13 — FTS5 
 
 ### Files to create
 
-- `modules/memory/src/main/kotlin/com/talos/memory/SystemPromptAssembler.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/SystemPromptAssembler.kt` (new)
 - Tests
 
 ### Detailed work
@@ -733,8 +733,8 @@ Pattern-scan content destined for `memory_docs` writes. High-severity hits rejec
 
 ### Files to create
 
-- `modules/memory/src/main/kotlin/com/talos/memory/hygiene/HygieneScanner.kt` (new)
-- `modules/memory/src/main/kotlin/com/talos/memory/hygiene/HygieneRules.kt` (new — pattern set)
+- `modules/memory/src/main/kotlin/com/hebe/memory/hygiene/HygieneScanner.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/hygiene/HygieneRules.kt` (new — pattern set)
 - Tests
 
 ### Detailed work
@@ -759,7 +759,7 @@ Pattern-scan content destined for `memory_docs` writes. High-severity hits rejec
    - `\bexec\s*\(\s*['"]?(rm|sudo)\b` → Medium
    - Basic prompt-injection markers (`### ASSISTANT:`, `### SYSTEM:`) → Low
 
-3. Wire into `MemoryStore.appendDoc`: on `Reject`, throw `TalosException.Memory("rejected: ${finding.rule}")`. On `Warn`, append the warning to the observer.
+3. Wire into `MemoryStore.appendDoc`: on `Reject`, throw `HebeException.Memory("rejected: ${finding.rule}")`. On `Warn`, append the warning to the observer.
 
 4. Make the rule set externalisable: `HygieneRules.fromConfig(toml)` so users can extend.
 
@@ -799,7 +799,7 @@ A hook so the channel adapter can declare "this conversation is a group" and hav
 
 ### Files to create / modify
 
-- `modules/memory/src/main/kotlin/com/talos/memory/SystemPromptAssembler.kt` (edit — already added in M1.T11; just ensure the parameter is exposed)
+- `modules/memory/src/main/kotlin/com/hebe/memory/SystemPromptAssembler.kt` (edit — already added in M1.T11; just ensure the parameter is exposed)
 - Tests
 
 ### Detailed work
@@ -845,7 +845,7 @@ Add a `category` column to `memory_docs` (or reuse `scope`) so we can filter `Co
 ### Files to create / modify
 
 - `modules/memory/src/main/resources/db/migration/V6__memory_categories.sql` (new — additive)
-- `modules/memory/src/main/kotlin/com/talos/memory/MemoryCategory.kt` (new — already in `api`? if so, just extend)
+- `modules/memory/src/main/kotlin/com/hebe/memory/MemoryCategory.kt` (new — already in `api`? if so, just extend)
 - Edit `MemoryStore.appendDoc` to accept a `category` parameter
 
 ### Detailed work
@@ -890,7 +890,7 @@ Cheap caching layer for identical LLM prompts in deterministic mode (`temperatur
 
 ### Files to create
 
-- `modules/memory/src/main/kotlin/com/talos/memory/cache/ResponseCache.kt` (new)
+- `modules/memory/src/main/kotlin/com/hebe/memory/cache/ResponseCache.kt` (new)
 - Tests
 
 ### Detailed work
@@ -932,8 +932,8 @@ End-to-end test demonstrating: write doc → index → search retrieves → hygi
 
 ### Files to create
 
-- `modules/memory/src/test/kotlin/com/talos/memory/integration/MemoryRoundTripTest.kt` (new)
-- `modules/memory/src/test/kotlin/com/talos/memory/integration/HygieneIntegrationTest.kt` (new)
+- `modules/memory/src/test/kotlin/com/hebe/memory/integration/MemoryRoundTripTest.kt` (new)
+- `modules/memory/src/test/kotlin/com/hebe/memory/integration/HygieneIntegrationTest.kt` (new)
 - Test fixture corpus: 10 small markdown files
 
 ### Detailed work
@@ -947,7 +947,7 @@ End-to-end test demonstrating: write doc → index → search retrieves → hygi
 
 2. `HygieneIntegrationTest`:
    - Attempt to write a doc with a known injection pattern.
-   - Verify `TalosException.Memory` is thrown.
+   - Verify `HebeException.Memory` is thrown.
 
 3. Tag both `@Tag("integration")`. Run by default in CI; can be excluded locally with `-Dexclude=integration`.
 

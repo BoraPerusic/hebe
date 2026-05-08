@@ -19,18 +19,18 @@ References: [`../v1-architecture.md`](../v1-architecture.md) §§4, 8, 11, 12.
 
 ### Goal
 
-Build a hello-world plugin in the same repo (or a sibling), load it via PF4J inside the running talos process, and invoke its `say_hello` tool from a chat turn. Verify that the plugin classloader cannot see `com.talos.core.*` or `koog`.
+Build a hello-world plugin in the same repo (or a sibling), load it via PF4J inside the running hebe process, and invoke its `say_hello` tool from a chat turn. Verify that the plugin classloader cannot see `com.hebe.core.*` or `koog`.
 
 ### Files to create
 
 - `modules/plugins/build.gradle.kts` (edit)
-- `modules/plugins/src/main/kotlin/com/talos/plugins/PluginManager.kt` (new — minimal PF4J wrapper)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/PluginManager.kt` (new — minimal PF4J wrapper)
 - `plugin-template/` (new — Gradle subproject; not a `:modules:` member)
 - `plugin-template/build.gradle.kts` (new)
 - `plugin-template/src/main/kotlin/com/example/HelloPlugin.kt` (new)
 - `plugin-template/src/main/kotlin/com/example/SayHelloTool.kt` (new)
 - `plugin-template/src/main/resources/plugin.properties` (new)
-- `plugin-template/src/main/resources/plugin.toml` (new — talos manifest stub)
+- `plugin-template/src/main/resources/plugin.toml` (new — hebe manifest stub)
 - Spike test that runs end-to-end
 
 ### Detailed work
@@ -55,7 +55,7 @@ Build a hello-world plugin in the same repo (or a sibling), load it via PF4J ins
            pf4j.loadPlugins()
            pf4j.startPlugins()
        }
-       fun tools(): List<Tool> = pf4j.getExtensions(TalosPlugin::class.java)
+       fun tools(): List<Tool> = pf4j.getExtensions(HebePlugin::class.java)
            .flatMap { plugin ->
                val pluginHost = host.create(plugin.wrapper.pluginId)
                plugin.init(pluginHost)
@@ -87,12 +87,12 @@ Build a hello-world plugin in the same repo (or a sibling), load it via PF4J ins
 
    ```kotlin
    package com.example
-   import com.talos.plugin.TalosPlugin
-   import com.talos.plugin.PluginHost
-   import com.talos.api.Tool
+   import com.hebe.plugin.HebePlugin
+   import com.hebe.plugin.PluginHost
+   import com.hebe.api.Tool
    import org.pf4j.PluginWrapper
 
-   class HelloPlugin(wrapper: PluginWrapper) : TalosPlugin(wrapper) {
+   class HelloPlugin(wrapper: PluginWrapper) : HebePlugin(wrapper) {
        override fun tools(host: PluginHost): List<Tool> = listOf(SayHelloTool(host))
    }
    ```
@@ -120,14 +120,14 @@ Build a hello-world plugin in the same repo (or a sibling), load it via PF4J ins
    plugin.id=hello
    plugin.class=com.example.HelloPlugin
    plugin.version=0.1.0
-   plugin.provider=talos-spike
+   plugin.provider=hebe-spike
    plugin.dependencies=
    ```
 
-7. **`plugin.toml`** (stub for the spike — only `talosApiVersion`, no permissions):
+7. **`plugin.toml`** (stub for the spike — only `hebeApiVersion`, no permissions):
 
    ```toml
-   talos_api_version = "0.1.x"
+   hebe_api_version = "0.1.x"
    capabilities = ["tool"]
    permissions = []
    allowlist_domains = []
@@ -152,15 +152,15 @@ Build a hello-world plugin in the same repo (or a sibling), load it via PF4J ins
 
 9. **Negative test (the load-time isolation check)**:
 
-   - In the plugin source, add a debug method `internalAccessTest()` that tries `Class.forName("com.talos.core.agent.TalosAgent")` and reports the result.
+   - In the plugin source, add a debug method `internalAccessTest()` that tries `Class.forName("com.hebe.core.agent.HebeAgent")` and reports the result.
    - Verify it throws `ClassNotFoundException`. If it succeeds, the classloader hierarchy is wrong and we have a bug.
    - This is the **load-bearing check** of the spike. If this passes, the rest of M6 has a stable foundation.
 
 ### Tests / verification
 
 - Spike test passes.
-- Plugin classloader can't see `com.talos.core.*`.
-- Plugin classloader CAN see `com.talos.api.*` and `com.talos.plugin.*`.
+- Plugin classloader can't see `com.hebe.core.*`.
+- Plugin classloader CAN see `com.hebe.api.*` and `com.hebe.plugin.*`.
 
 ### Acceptance criteria
 
@@ -172,14 +172,14 @@ Build a hello-world plugin in the same repo (or a sibling), load it via PF4J ins
 
 ### Pitfalls
 
-- PF4J's classloader by default is parent-first; we want **child-first for the plugin's own classes** but **parent-first for `talos-api` and `plugin-api`**. Configure via `DefaultPluginManager.createPluginClassLoader` override; if it's awkward, document and revisit in M6.T2.
-- Kotlin metadata: PF4J needs to find the `TalosPlugin` subclass. Make sure the plugin JAR's manifest entry `plugin.class` points at the FQCN exactly.
+- PF4J's classloader by default is parent-first; we want **child-first for the plugin's own classes** but **parent-first for `hebe-api` and `plugin-api`**. Configure via `DefaultPluginManager.createPluginClassLoader` override; if it's awkward, document and revisit in M6.T2.
+- Kotlin metadata: PF4J needs to find the `HebePlugin` subclass. Make sure the plugin JAR's manifest entry `plugin.class` points at the FQCN exactly.
 - The `compileOnly` dep on `plugin-api`/`api` is **load-bearing**. If the plugin uses `implementation`, it bundles those classes and the host's copy collides — instant `ClassCastException` at the boundary.
 
 ### References
 
 - `v1-architecture.md` §8 (plugin model)
-- [`../talos-brainstorming-responses.md`](../talos-brainstorming-responses.md) §6.2
+- [`../hebe-brainstorming-responses.md`](../hebe-brainstorming-responses.md) §6.2
 
 ---
 
@@ -196,26 +196,26 @@ Productionise the spike's `PluginManager` into a configurable wrapper with expli
 
 ### Files to create
 
-- `modules/plugins/src/main/kotlin/com/talos/plugins/TalosPluginManager.kt` (new — extends `DefaultPluginManager`)
-- `modules/plugins/src/main/kotlin/com/talos/plugins/TalosPluginClassLoader.kt` (new)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/HebePluginManager.kt` (new — extends `DefaultPluginManager`)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/HebePluginClassLoader.kt` (new)
 - Tests including isolation negative test
 
 ### Detailed work
 
-1. `TalosPluginClassLoader` extends PF4J's `PluginClassLoader`:
-   - Parent classloader = a "plugin-api" classloader that exposes only `com.talos.api.*` and `com.talos.plugin.*`.
-   - Strategy: child-first for plugin's own classes + bundled `lib/`, parent-first for `talos-api` + `plugin-api`.
+1. `HebePluginClassLoader` extends PF4J's `PluginClassLoader`:
+   - Parent classloader = a "plugin-api" classloader that exposes only `com.hebe.api.*` and `com.hebe.plugin.*`.
+   - Strategy: child-first for plugin's own classes + bundled `lib/`, parent-first for `hebe-api` + `plugin-api`.
 
-2. `TalosPluginManager.createPluginClassLoader(...)` returns the above.
+2. `HebePluginManager.createPluginClassLoader(...)` returns the above.
 
-3. The "plugin-api classloader" is built once at startup: a `URLClassLoader` over the `talos-api` and `plugin-api` JARs only (extracted via `ClassLoader.getSystemResource`, or built explicitly).
+3. The "plugin-api classloader" is built once at startup: a `URLClassLoader` over the `hebe-api` and `plugin-api` JARs only (extracted via `ClassLoader.getSystemResource`, or built explicitly).
 
-4. Test: a synthetic plugin JAR containing a class that references `com.talos.core.agent.TalosAgent` fails to load with `NoClassDefFoundError` at the right moment.
+4. Test: a synthetic plugin JAR containing a class that references `com.hebe.core.agent.HebeAgent` fails to load with `NoClassDefFoundError` at the right moment.
 
 ### Tests / verification
 
-- Isolation check: `Class.forName("com.talos.core.*")` fails inside plugins.
-- Visibility check: `Class.forName("com.talos.api.Tool")` succeeds.
+- Isolation check: `Class.forName("com.hebe.core.*")` fails inside plugins.
+- Visibility check: `Class.forName("com.hebe.api.Tool")` succeeds.
 - Two plugins with conflicting third-party deps (e.g. both bundle `okhttp` at different versions) coexist (each sees its own).
 
 ### Acceptance criteria
@@ -247,14 +247,14 @@ Parse `plugin.toml` into `PluginManifest`. Errors point to row/col. Missing requ
 
 ### Files to create
 
-- `modules/plugins/src/main/kotlin/com/talos/plugins/manifest/ManifestParser.kt` (new)
-- `modules/plugins/src/main/kotlin/com/talos/plugins/manifest/ManifestError.kt` (new)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/manifest/ManifestParser.kt` (new)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/manifest/ManifestError.kt` (new)
 - Tests
 
 ### Detailed work
 
 1. Required fields in `plugin.toml`:
-   - `talos_api_version` (string, semver-ish range)
+   - `hebe_api_version` (string, semver-ish range)
    - `capabilities` (array)
    - `permissions` (array)
    - `allowlist_domains` (array, may be empty)
@@ -275,7 +275,7 @@ Parse `plugin.toml` into `PluginManifest`. Errors point to row/col. Missing requ
 ### Tests / verification
 
 - Golden valid manifest parses.
-- Missing `talos_api_version` → error with line/col.
+- Missing `hebe_api_version` → error with line/col.
 - Unknown capability → error.
 
 ### Acceptance criteria
@@ -302,9 +302,9 @@ Build a per-plugin `PluginHost` instance whose `http()` / `env(name)` / `secret(
 
 ### Files to create
 
-- `modules/plugins/src/main/kotlin/com/talos/plugins/host/RealPluginHost.kt` (new)
-- `modules/plugins/src/main/kotlin/com/talos/plugins/host/GatedHttpClientImpl.kt` (new)
-- `modules/plugins/src/main/kotlin/com/talos/plugins/host/HostFactory.kt` (new)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/host/RealPluginHost.kt` (new)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/host/GatedHttpClientImpl.kt` (new)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/host/HostFactory.kt` (new)
 - Tests
 
 ### Detailed work
@@ -318,7 +318,7 @@ Build a per-plugin `PluginHost` instance whose `http()` / `env(name)` / `secret(
 
 3. Auth-handle resolution: when a request specifies an auth handle, the host appends `Authorization: Bearer <secretValue>` (or whatever the configured scheme is) before sending. The plugin never sees the raw secret.
 
-4. `HostFactory.create(pluginId, manifest)`: factory used by `TalosPluginManager` to build a host instance per plugin.
+4. `HostFactory.create(pluginId, manifest)`: factory used by `HebePluginManager` to build a host instance per plugin.
 
 ### Tests / verification
 
@@ -355,7 +355,7 @@ Verify plugin signatures on load. `signature_mode = optional | required | disabl
 
 ### Files to create
 
-- `modules/plugins/src/main/kotlin/com/talos/plugins/signature/SignatureVerifier.kt` (new)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/signature/SignatureVerifier.kt` (new)
 - Tests
 
 ### Detailed work
@@ -403,12 +403,12 @@ Verify plugin signatures on load. `signature_mode = optional | required | disabl
 
 ### Goal
 
-Refuse plugins whose `talos_api_version` doesn't match the host's API version.
+Refuse plugins whose `hebe_api_version` doesn't match the host's API version.
 
 ### Files to create
 
-- `modules/plugins/src/main/kotlin/com/talos/plugins/abi/AbiChecker.kt` (new)
-- `modules/plugin-api/src/main/kotlin/com/talos/plugin/AbiVersion.kt` (new — exposed constant)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/abi/AbiChecker.kt` (new)
+- `modules/plugin-api/src/main/kotlin/com/hebe/plugin/AbiVersion.kt` (new — exposed constant)
 - Tests
 
 ### Detailed work
@@ -424,7 +424,7 @@ Refuse plugins whose `talos_api_version` doesn't match the host's API version.
 
 ### Tests / verification
 
-- Match cases pass; mismatch cases fail with a remediation hint ("plugin requires 0.2.x but host is 0.1.x; upgrade talos or downgrade plugin").
+- Match cases pass; mismatch cases fail with a remediation hint ("plugin requires 0.2.x but host is 0.1.x; upgrade hebe or downgrade plugin").
 
 ### Acceptance criteria
 
@@ -450,8 +450,8 @@ Glue: when PF4J starts a plugin, build the host, run `init`, register tools. Whe
 
 ### Files to create
 
-- `modules/plugins/src/main/kotlin/com/talos/plugins/Lifecycle.kt` (new)
-- `modules/plugins/src/main/kotlin/com/talos/plugins/PluginRegistration.kt` (new — bookkeeping)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/Lifecycle.kt` (new)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/PluginRegistration.kt` (new — bookkeeping)
 - Tests
 
 ### Detailed work
@@ -460,7 +460,7 @@ Glue: when PF4J starts a plugin, build the host, run `init`, register tools. Whe
    - Read manifest.
    - Verify signature → ABI check → if either fails, log + stop the plugin via PF4J and return.
    - Build `PluginHost` via `HostFactory.create(pluginId, manifest)`.
-   - Cast `pluginWrapper.plugin` to `TalosPlugin`; call `init(host)` and collect `tools(host)`.
+   - Cast `pluginWrapper.plugin` to `HebePlugin`; call `init(host)` and collect `tools(host)`.
    - For each tool, register in `ToolRegistry` with a namespaced name `<pluginId>:<tool.spec.name>`. Track registrations in `PluginRegistration` so we can unregister precisely.
 
 2. `Lifecycle.beforeStop(pluginWrapper)`:
@@ -496,12 +496,12 @@ Glue: when PF4J starts a plugin, build the host, run `init`, register tools. Whe
 
 ### Goal
 
-`OciClient.pull(ref): Path` returns a tarball at `~/.talos/cache/oci/<sha256>/`. Authenticated against ACR via `DefaultAzureCredential` chain; falls back to ORAS auth file / docker config for non-Azure registries.
+`OciClient.pull(ref): Path` returns a tarball at `~/.hebe/cache/oci/<sha256>/`. Authenticated against ACR via `DefaultAzureCredential` chain; falls back to ORAS auth file / docker config for non-Azure registries.
 
 ### Files to create
 
-- `modules/plugins/src/main/kotlin/com/talos/plugins/oci/OciClient.kt` (new)
-- `modules/plugins/src/main/kotlin/com/talos/plugins/oci/AzureAuthChain.kt` (new)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/oci/OciClient.kt` (new)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/oci/AzureAuthChain.kt` (new)
 - Tests with a local OCI registry (Docker container via Testcontainers; mark `@Tag("integration")`)
 
 ### Detailed work
@@ -513,9 +513,9 @@ Glue: when PF4J starts a plugin, build the host, run `init`, register tools. Whe
    - Resolve auth:
      - If registry hostname matches `*.azurecr.io`, use `AzureAuthChain` (DefaultAzureCredential → token → exchange for ACR refresh+access tokens). The chain reads env (`AZURE_CLIENT_ID/SECRET/TENANT_ID`), MSI (`IMDS_ENDPOINT`), `az login` cache (`~/.azure/`), in that order.
      - Else look up `~/.docker/config.json` or `~/.config/oras/config.json` for `auths[registry].auth` (base64 user:pass).
-   - Pull manifest, verify media type `application/vnd.talos.plugin.v1+json`.
+   - Pull manifest, verify media type `application/vnd.hebe.plugin.v1+json`.
    - Pull layer 0 (the archive) into the cache directory by sha256.
-   - Optional: pull the signature layer (`application/vnd.talos.plugin.signature.v1+ed25519`) and pass to the verifier in M6.T9.
+   - Optional: pull the signature layer (`application/vnd.hebe.plugin.signature.v1+ed25519`) and pass to the verifier in M6.T9.
 
 3. Idempotent: if the cache already has the artifact (matched by digest), short-circuit.
 
@@ -535,7 +535,7 @@ Glue: when PF4J starts a plugin, build the host, run `init`, register tools. Whe
 ### Pitfalls
 
 - ACR token exchange: the bearer token from AAD doesn't work directly; you must POST to `https://<registry>/oauth2/exchange` to get an ACR-specific access token. ORAS Java SDK may handle this automatically — confirm.
-- Layer media types are talos-specific; if a registry rejects them, fall back to `application/vnd.oci.image.layer.v1.tar+gzip`.
+- Layer media types are hebe-specific; if a registry rejects them, fall back to `application/vnd.oci.image.layer.v1.tar+gzip`.
 
 ### References
 
@@ -543,7 +543,7 @@ Glue: when PF4J starts a plugin, build the host, run `init`, register tools. Whe
 
 ---
 
-## M6.T9 — `talos plugin install <oci-ref>` (pull → verify → extract → load)
+## M6.T9 — `hebe plugin install <oci-ref>` (pull → verify → extract → load)
 
 **Status**: pending  
 **Size**: M  
@@ -556,8 +556,8 @@ End-to-end install flow as a single CLI command. After this lands the production
 
 ### Files to create
 
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Plugin.kt` (edit — implement `install`)
-- `modules/plugins/src/main/kotlin/com/talos/plugins/install/InstallFlow.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Plugin.kt` (edit — implement `install`)
+- `modules/plugins/src/main/kotlin/com/hebe/plugins/install/InstallFlow.kt` (new)
 - Tests
 
 ### Detailed work
@@ -566,8 +566,8 @@ End-to-end install flow as a single CLI command. After this lands the production
    - Pull via `OciClient`.
    - Verify signature via `SignatureVerifier`.
    - Verify ABI via `AbiChecker`.
-   - Extract archive into `~/.talos/plugins/<name>-<version>/`.
-   - Notify the running `TalosPluginManager` to load the new plugin (or instruct the user to restart, depending on the lifecycle strategy — since hot-reload is deferred per `talos-brainstorming-responses.md` §6.6, **v1 requires a restart**; the install command exits successfully with a "restart talos to activate" notice).
+   - Extract archive into `~/.hebe/plugins/<name>-<version>/`.
+   - Notify the running `HebePluginManager` to load the new plugin (or instruct the user to restart, depending on the lifecycle strategy — since hot-reload is deferred per `hebe-brainstorming-responses.md` §6.6, **v1 requires a restart**; the install command exits successfully with a "restart hebe to activate" notice).
 
 2. Persist install records in `settings`:
 
@@ -575,19 +575,19 @@ End-to-end install flow as a single CLI command. After this lands the production
    key = "plugins.installed", value = JSON([{name, version, ref, installed_at}])
    ```
 
-3. CLI: `talos plugin install acr.example.com/talos-plugins/linear:0.3.1`. Output:
+3. CLI: `hebe plugin install acr.example.com/hebe-plugins/linear:0.3.1`. Output:
 
    ```
-   Pulling acr.example.com/talos-plugins/linear:0.3.1 …
-   Verified signature (publisher: talos-team, ed25519:abc…).
+   Pulling acr.example.com/hebe-plugins/linear:0.3.1 …
+   Verified signature (publisher: hebe-team, ed25519:abc…).
    ABI compatible (plugin: 0.1.x, host: 0.1.0).
-   Extracted to ~/.talos/plugins/linear-0.3.1/
-   Restart talos to load this plugin.
+   Extracted to ~/.hebe/plugins/linear-0.3.1/
+   Restart hebe to load this plugin.
    ```
 
 ### Tests / verification
 
-- Local OCI registry → install → restart → `talos tool list` shows the new tool.
+- Local OCI registry → install → restart → `hebe tool list` shows the new tool.
 - Bad signature in `required` mode → install refuses.
 
 ### Acceptance criteria
@@ -602,7 +602,7 @@ End-to-end install flow as a single CLI command. After this lands the production
 
 ---
 
-## M6.T10 — `talos plugin install <local-path>` (sideload)
+## M6.T10 — `hebe plugin install <local-path>` (sideload)
 
 **Status**: pending  
 **Size**: S  
@@ -615,14 +615,14 @@ Bypass OCI for local development. Same final steps as M6.T9 minus the pull.
 
 ### Files to create / modify
 
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Plugin.kt` (edit)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Plugin.kt` (edit)
 - Tests
 
 ### Detailed work
 
 1. Detect arg shape: if it looks like a path (`./foo.jar`, `/abs/path/`), treat as sideload; else treat as OCI ref.
 
-2. Sideload path: copy/extract into `~/.talos/plugins/<name>-<version>/`, run signature + ABI check (with the `signature_mode = disabled` shortcut for unsigned local builds — opt-in via `--unsigned` flag).
+2. Sideload path: copy/extract into `~/.hebe/plugins/<name>-<version>/`, run signature + ABI check (with the `signature_mode = disabled` shortcut for unsigned local builds — opt-in via `--unsigned` flag).
 
 ### Tests / verification
 
@@ -635,7 +635,7 @@ Bypass OCI for local development. Same final steps as M6.T9 minus the pull.
 
 ---
 
-## M6.T11 — `talos plugin list` / `talos plugin remove`
+## M6.T11 — `hebe plugin list` / `hebe plugin remove`
 
 **Status**: pending  
 **Size**: M  
@@ -648,12 +648,12 @@ Inspection + uninstall.
 
 ### Files to create / modify
 
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Plugin.kt` (edit)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Plugin.kt` (edit)
 - Tests
 
 ### Detailed work
 
-1. `talos plugin list`:
+1. `hebe plugin list`:
 
    ```
    ID      VERSION  STATUS    CAPABILITIES   PERMISSIONS
@@ -662,14 +662,14 @@ Inspection + uninstall.
    ```
 
    - Reads PF4J state + the `settings.plugins.installed` record.
-   - "error" status indicates the plugin failed to load (signature, ABI, etc.); details available via `talos plugin show <name>`.
+   - "error" status indicates the plugin failed to load (signature, ABI, etc.); details available via `hebe plugin show <name>`.
 
-2. `talos plugin remove <name>`:
-   - Stop via `TalosPluginManager.unloadPlugin(id)`.
-   - Delete `~/.talos/plugins/<name>-<version>/`.
+2. `hebe plugin remove <name>`:
+   - Stop via `HebePluginManager.unloadPlugin(id)`.
+   - Delete `~/.hebe/plugins/<name>-<version>/`.
    - Update `settings.plugins.installed`.
 
-3. `talos plugin show <name>` (bonus): full manifest + last error if any.
+3. `hebe plugin show <name>` (bonus): full manifest + last error if any.
 
 ### Tests / verification
 
@@ -699,13 +699,13 @@ If `config.plugins.auto_pull = ["linear:0.3.1", ...]`, pull missing plugins at b
 
 ### Files to create / modify
 
-- `modules/cli-app/src/main/kotlin/com/talos/cli/AppComponents.kt` (edit — add to boot sequence)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/AppComponents.kt` (edit — add to boot sequence)
 - Tests
 
 ### Detailed work
 
 1. After `Db.open` and before `PluginManager.start()`, iterate `auto_pull`:
-   - If `~/.talos/plugins/<name>-<version>/` exists, skip.
+   - If `~/.hebe/plugins/<name>-<version>/` exists, skip.
    - Else `InstallFlow.install("${config.plugins.registry}/${name}:${version}")`.
 
 2. Failures are non-fatal: log + continue; `doctor` reports.
@@ -751,17 +751,17 @@ A polished Gradle template repo for internal plugin authors. Includes the manife
 
 ### Detailed work
 
-1. Standalone `settings.gradle.kts` so the template can be copied to a new repo without bringing the rest of talos.
+1. Standalone `settings.gradle.kts` so the template can be copied to a new repo without bringing the rest of hebe.
 
 2. `oras-publish` task signs (Ed25519) + builds the OCI artifact + pushes to the configured registry. Inputs from environment: `KOKLYP_PUBLISHER_KEY` (private key path), `KOKLYP_REGISTRY`, `KOKLYP_PLUGIN_NAME`.
 
-3. README explains: how to add tools, the manifest, capabilities/permissions, the publish flow, the install flow on the talos side.
+3. README explains: how to add tools, the manifest, capabilities/permissions, the publish flow, the install flow on the hebe side.
 
-4. Author signs: `gradle talosSign` produces a detached signature; `gradle talosPublish` runs sign + push.
+4. Author signs: `gradle hebeSign` produces a detached signature; `gradle hebePublish` runs sign + push.
 
 ### Tests / verification
 
-- Manual: copy `plugin-template/` to a fresh dir, edit `MyPlugin`, run `gradle talosPublish` against a local registry, then `talos plugin install` round-trips.
+- Manual: copy `plugin-template/` to a fresh dir, edit `MyPlugin`, run `gradle hebePublish` against a local registry, then `hebe plugin install` round-trips.
 
 ### Acceptance criteria
 

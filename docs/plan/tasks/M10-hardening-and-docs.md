@@ -26,18 +26,18 @@ A 10-line quickstart at the top of the repo's `README.md` that takes a new user 
 ### Detailed work
 
 1. Sections:
-   - **What is talos?** — one paragraph (autonomous JVM agent, single-user, BYOK).
+   - **What is hebe?** — one paragraph (autonomous JVM agent, single-user, BYOK).
    - **Install**:
      ```
-     curl -sSL https://example.com/talos/install.sh | bash
+     curl -sSL https://example.com/hebe/install.sh | bash
      # or
-     ./gradlew shadowJar && cp build/libs/talos.jar /usr/local/lib/talos/
+     ./gradlew shadowJar && cp build/libs/hebe.jar /usr/local/lib/hebe/
      ```
    - **First run**:
      ```
-     talos onboard          # interactive setup
-     talos doctor           # verify
-     talos run              # start the agent (CLI mode)
+     hebe onboard          # interactive setup
+     hebe doctor           # verify
+     hebe run              # start the agent (CLI mode)
      ```
    - **Pointer to the docs/plan/v1-* and quickstart** for more.
 
@@ -81,18 +81,18 @@ A longer step-by-step guide: clone → build → onboard → first chat → firs
    - Build from source (`./gradlew shadowJar`).
    - Onboarding walkthrough (with sample inputs).
    - First chat in CLI.
-   - First chat in the web console (via `talos run`, then opening `localhost:8765`).
+   - First chat in the web console (via `hebe run`, then opening `localhost:8765`).
    - Adding the Telegram channel.
    - Installing a plugin from the local OCI registry.
    - Running as a service.
 
-2. Each step ends with a verification (`./talos status`, doctor, etc.).
+2. Each step ends with a verification (`./hebe status`, doctor, etc.).
 
 3. Length: aim for ~5 pages of markdown; include sample command output to show the "right" look.
 
 ### Tests / verification
 
-- One reviewer who hasn't seen talos before follows it on a fresh machine and reports time-to-first-chat.
+- One reviewer who hasn't seen hebe before follows it on a fresh machine and reports time-to-first-chat.
 
 ### Acceptance criteria
 
@@ -130,7 +130,7 @@ A formal document covering the plugin authoring contract: manifest, classloader 
    - **Signing** (Ed25519 generation, signature_mode interaction).
    - **Distribution** (OCI artifact format, media types, ACR auth).
    - **Lifecycle** (created → resolved → started → stopped → unloaded).
-   - **Restrictions** (no `Class.forName("com.talos.core.*")`, no bundled `talos-api`/`plugin-api` in `implementation`, no use of `Runtime.exec` from the plugin sandbox surface — but a frank acknowledgement that nothing prevents it).
+   - **Restrictions** (no `Class.forName("com.hebe.core.*")`, no bundled `hebe-api`/`plugin-api` in `implementation`, no use of `Runtime.exec` from the plugin sandbox surface — but a frank acknowledgement that nothing prevents it).
    - **Trust posture**: bold callout that JVM plugins are *not* sandboxed; trust whom you install from.
 
 2. Include a working sample (link to `plugin-template/`).
@@ -156,7 +156,7 @@ A formal document covering the plugin authoring contract: manifest, classloader 
 
 ### Goal
 
-How to: (a) point Claude Desktop / Cursor / Windsurf at `talos mcp serve`; (b) connect talos as a client to external MCP servers.
+How to: (a) point Claude Desktop / Cursor / Windsurf at `hebe mcp serve`; (b) connect hebe as a client to external MCP servers.
 
 ### Files to create
 
@@ -169,8 +169,8 @@ How to: (a) point Claude Desktop / Cursor / Windsurf at `talos mcp serve`; (b) c
      ```json
      {
        "mcpServers": {
-         "talos": {
-           "command": "/usr/local/bin/talos",
+         "hebe": {
+           "command": "/usr/local/bin/hebe",
            "args": ["mcp", "serve"]
          }
        }
@@ -247,7 +247,7 @@ Single document covering autonomy levels, sandbox posture, receipts, plugin trus
 
 ### Goal
 
-Step-by-step Telegram setup: BotFather → token → operator id → wired up via `talos onboard` (or manually).
+Step-by-step Telegram setup: BotFather → token → operator id → wired up via `hebe onboard` (or manually).
 
 ### Files to create
 
@@ -259,7 +259,7 @@ Step-by-step Telegram setup: BotFather → token → operator id → wired up vi
    - Create the bot via `@BotFather`; copy the token.
    - Disable group messaging on the bot (we don't support groups in v1).
    - Set bot privacy mode (`/setprivacy` → `Disable`).
-   - Operator id: how to find yours (DM `@userinfobot` or run `talos onboard`'s auto-detect).
+   - Operator id: how to find yours (DM `@userinfobot` or run `hebe onboard`'s auto-detect).
    - Webhook vs long-poll trade-offs.
    - Sample `config.toml` block.
    - Common errors (rate limits, missing operator id).
@@ -267,7 +267,7 @@ Step-by-step Telegram setup: BotFather → token → operator id → wired up vi
 2. Recommended **nginx/Caddy** snippet for terminating TLS in front of the gateway when using webhooks. Caddy:
 
    ```
-   talos.example.com {
+   hebe.example.com {
        reverse_proxy 127.0.0.1:8765
    }
    ```
@@ -293,7 +293,7 @@ Step-by-step Telegram setup: BotFather → token → operator id → wired up vi
 
 ### Goal
 
-Run talos continuously for 7 days under systemd; verify no JVM crash, no DB corruption, at least one routine fires daily, heartbeat 4×/day.
+Run hebe continuously for 7 days under systemd; verify no JVM crash, no DB corruption, at least one routine fires daily, heartbeat 4×/day.
 
 ### Files to create
 
@@ -311,9 +311,9 @@ Run talos continuously for 7 days under systemd; verify no JVM crash, no DB corr
 
 3. `soak-monitor.sh` runs every hour via cron:
    - Check PID file present.
-   - `talos doctor --json | jq '.checks[].status'` — alert on any `FAIL`.
+   - `hebe doctor --json | jq '.checks[].status'` — alert on any `FAIL`.
    - SQLite integrity: `pragma integrity_check;`.
-   - Receipts verify: `talos memory show receipts/$(date +%Y-%m).log --verify`.
+   - Receipts verify: `hebe memory show receipts/$(date +%Y-%m).log --verify`.
    - Disk usage trend (DB shouldn't grow unbounded).
 
 4. Document any incidents in `soak-test.md`; resolve before declaring v1 ready.

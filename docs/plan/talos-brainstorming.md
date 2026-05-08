@@ -1,4 +1,4 @@
-# talos — brainstorming (synthesis)
+# hebe — brainstorming (synthesis)
 
 Opinionated working document for discussion. Synthesis of Claude's draft (the spine) plus useful pushbacks/risks/questions surfaced by GPT, Gemini, and MiniMax. The user explicitly asked for **strong opinions and pushbacks**, so this doc takes positions. Disagree freely.
 
@@ -85,7 +85,7 @@ If the operator wants `Full` autonomy for kubectl, that's a deliberate config ch
 
 ### 1.7 "Memory management: IMPORTANT, multi-tier, scheduled internal management"
 
-The brief flags memory as important but vague. GPT's draft did the most useful work here, naming explicit tiers (Live / Transcript / Curated / Derived / Retrieval) and the maintenance jobs (transcript summarisation, fact extraction, daily digest, stale cleanup, embedding refresh, failed-job detection). I've folded both into `talos-architecture.md` §13.
+The brief flags memory as important but vague. GPT's draft did the most useful work here, naming explicit tiers (Live / Transcript / Curated / Derived / Retrieval) and the maintenance jobs (transcript summarisation, fact extraction, daily digest, stale cleanup, embedding refresh, failed-job detection). I've folded both into `hebe-architecture.md` §13.
 
 **v1 needs:**
 
@@ -134,7 +134,7 @@ Web search needs an external provider (Tavily, Brave, DuckDuckGo, You.com, Serpe
 
 Koog is young (active dev as of March 2026). It might lose support, change APIs, get acquired, or become incompatible. Use it for the hard parts (streaming protocols, history compression, agent persistence, OpenTelemetry) but **never let `ai.koog.*` types appear in our channel/tool/memory code.**
 
-The talos `LlmProvider` trait is *ours*. Internally, `KoogLlmProvider` adapts koog. If we have to swap, one file changes. (Gemini's brainstorming raised the alternative: build our own lightweight loop. I'd push back — that's reinventing the wheel for boring infrastructure. Wrap, don't replace, and keep the wrap thin.)
+The hebe `LlmProvider` trait is *ours*. Internally, `KoogLlmProvider` adapts koog. If we have to swap, one file changes. (Gemini's brainstorming raised the alternative: build our own lightweight loop. I'd push back — that's reinventing the wheel for boring infrastructure. Wrap, don't replace, and keep the wrap thin.)
 
 ### 2.2 The kernel ABI is **five traits, not ten**
 
@@ -148,7 +148,7 @@ The brief mentions extending with "new agents." That word is overloaded. Possibl
 
 1. New LLM providers — `LlmProvider`
 2. New behaviours — plugins / in-tree modules
-3. New autonomous personas — multiple `TalosAgent` instances with different identities
+3. New autonomous personas — multiple `HebeAgent` instances with different identities
 4. Sub-agents — one agent invokes another for a sub-task
 
 **Position: meanings 1, 2, 3 are extension axes; meaning 4 is just a tool.** A "research agent" sub-agent is implemented as a `Tool` that internally spawns a koog agent loop. The parent agent's prompt sees a tool called `research(question)`; the parent doesn't care it runs a whole sub-loop. (MiniMax 5.7 proposed a multi-agent router; that's a v2+ design.)
@@ -161,7 +161,7 @@ This is cheap to add now and miserable to retrofit. Do it.
 
 ### 2.5 Tool receipts on disk, not in the DB
 
-ZeroClaw's chained Ed25519 receipt log is great. Keep it on disk (`~/.talos/receipts/YYYY-MM.log`), not in the SQLite DB. Reasons:
+ZeroClaw's chained Ed25519 receipt log is great. Keep it on disk (`~/.hebe/receipts/YYYY-MM.log`), not in the SQLite DB. Reasons:
 
 - Append-only log file is naturally tamper-evident.
 - Easy to grep (`grep tool=shell receipts/*.log`).
@@ -215,7 +215,7 @@ The req mentions "cron-ish scheduling." It does not explicitly mention SOPs. Zer
 
 **My current bias: defer SOPs to v2.** Routines are enough for v1.
 
-But if you have a concrete use case — "I want talos to handle my weekly deploy with explicit approval steps" — then SOPs might earn their place in v1.
+But if you have a concrete use case — "I want hebe to handle my weekly deploy with explicit approval steps" — then SOPs might earn their place in v1.
 
 ### 3.2 Multi-user from day one, or single-user with a `userId` always-binding?
 
@@ -249,7 +249,7 @@ Re §2.3. If "new agents" means sub-agents-as-tools, we're aligned. If it means 
 Self-hosted small team could be either:
 
 - **One process, multiple users** — tenant-scoped DB, per-user pairings, single binary running 24/7.
-- **One process per user** — each user runs their own talos, federated channels.
+- **One process per user** — each user runs their own hebe, federated channels.
 
 Multi-user-one-process is simpler to deploy but more complex to design. Per-user processes are simpler to design but multiplies systemd unit files.
 
@@ -259,7 +259,7 @@ Multi-user-one-process is simpler to deploy but more complex to design. Per-user
 
 IronClaw flags this as a missing feature. ZeroClaw doesn't appear to have it either. MiniMax 3.1 lists it as Low priority.
 
-**My current bias: track versions in the manifest, allow `talos plugin install <name>@<version>` and `talos plugin rollback <name>` for v2.**
+**My current bias: track versions in the manifest, allow `hebe plugin install <name>@<version>` and `hebe plugin rollback <name>` for v2.**
 
 ---
 
@@ -278,9 +278,9 @@ IronClaw flags this as a missing feature. ZeroClaw doesn't appear to have it eit
 11. **OS keychain integration is finicky** on Linux (secret-service / kwallet / etc.). Mitigation: fallback to a passphrase-derived key stored in a chmod-600 file.
 12. **Self-hosted distribution.** If we ship a Docker image, our license must allow it; if a JAR, users need a JVM. Mitigation: ship both.
 13. **NEW: JVM plugin classloader isolation is leaky.** A malicious plugin can call `Runtime.exec`, `System.setProperty`, `Class.forName` with reflection, etc. — classloader isolation is *not* a sandbox. Mitigation: (a) document the trust posture loudly, (b) push untrusted code to MCP, (c) signature-required mode for production. See §6.4 below.
-14. **NEW: JVM plugin ABI compatibility.** A plugin compiled against `talos-api 0.1.0` may break on `0.2.0`. Mitigation: manifest pins `talos_api_version`; loader refuses incompatible versions and reports clearly.
+14. **NEW: JVM plugin ABI compatibility.** A plugin compiled against `hebe-api 0.1.0` may break on `0.2.0`. Mitigation: manifest pins `hebe_api_version`; loader refuses incompatible versions and reports clearly.
 15. **NEW: Plugin classloader leaks on update.** JVM doesn't guarantee classloader unloading; old class versions may stick around. Mitigation: warn loudly on plugin update; recommend restart for prod.
-16. **Memory tier vagueness.** GPT's risk: "memory tiers are described vaguely and implemented inconsistently." Mitigation: the five-tier framing in `talos-architecture.md` §13 is now explicit; we hold ourselves to it.
+16. **Memory tier vagueness.** GPT's risk: "memory tiers are described vaguely and implemented inconsistently." Mitigation: the five-tier framing in `hebe-architecture.md` §13 is now explicit; we hold ourselves to it.
 17. **Runtime gets too clever before the data model is stable.** GPT's risk. Mitigation: ship the SQLite schema + migrations early; freeze the message/turn/job tables before adding scheduler features.
 
 ---
@@ -312,7 +312,7 @@ These are the topics I think we should brainstorm next, since the user specifica
 
 Arguments **for** putting `Plugin` in `api`:
 
-- Then the plugin JAR depends only on `talos-api`. Clean.
+- Then the plugin JAR depends only on `hebe-api`. Clean.
 - Documents the contract centrally.
 
 Arguments **against**:
@@ -370,15 +370,15 @@ Original Claude draft pushed subprocess-sandbox (`firejail`/`bwrap`/Docker) to v
 
 The question: does v1 ship the shell tool with no native sandbox (relying on `allowed_commands` + `forbidden_commands` + the validator + receipts), or do we pull subprocess-sandbox forward to v1?
 
-**My current bias:** v1 ships shell with policy/validator/receipts only. Subprocess wrapper in v2. Reason: getting `firejail`/`bwrap`/Docker to work cross-platform is real engineering; v1 should focus on the agent loop. Operators who care can wrap talos itself in a container.
+**My current bias:** v1 ships shell with policy/validator/receipts only. Subprocess wrapper in v2. Reason: getting `firejail`/`bwrap`/Docker to work cross-platform is real engineering; v1 should focus on the agent loop. Operators who care can wrap hebe itself in a container.
 
 Pushback wanted: is "shell tool inside an unwrapped JVM" too dangerous a default?
 
 ### 6.6 Plugin hot-reload in v1?
 
-Hot-reload (watch `~/.talos/plugins/`, reload changed JARs) is a great dev-loop feature. But classloader unload is best-effort, and it adds bug surface.
+Hot-reload (watch `~/.hebe/plugins/`, reload changed JARs) is a great dev-loop feature. But classloader unload is best-effort, and it adds bug surface.
 
-**My current bias:** v2 only. v1 just rescans on `talos plugin install` / restart.
+**My current bias:** v2 only. v1 just rescans on `hebe plugin install` / restart.
 
 Pushback wanted: would you rather have hot-reload in v1 even if it occasionally leaks classloaders?
 
@@ -388,8 +388,8 @@ The features doc says "plugin template repo" as a v1 deliverable. Concrete quest
 
 - Gradle-based template? Maven? Both?
 - Kotlin-only, or Java-friendly too?
-- How do we ship the `plugin-api` jar — Maven Central, JitPack, GitHub Packages, or "git submodule the talos repo"?
-- Do we want the template to bundle a `talos test-plugin <jar>` command for round-trip testing?
+- How do we ship the `plugin-api` jar — Maven Central, JitPack, GitHub Packages, or "git submodule the hebe repo"?
+- Do we want the template to bundle a `hebe test-plugin <jar>` command for round-trip testing?
 
 These are small but they shape the plugin-author DX. Worth discussing.
 

@@ -12,8 +12,8 @@ build/
 # Logs
 *.log
 
-# Talos data dir (created at runtime)
-~/.talos/
+# Hebe data dir (created at runtime)
+~/.hebe/
 
 # Generated files
 generated/

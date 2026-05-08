@@ -1,4 +1,4 @@
-# talos v1 — task briefs (per milestone)
+# hebe v1 — task briefs (per milestone)
 
 Detailed, hand-off-ready task descriptions for each milestone in [`../v1-tasks.md`](../v1-tasks.md). Each file in this folder contains the briefs for one milestone, written so a coding agent can pick up a task and execute it without further questions.
 
@@ -59,10 +59,10 @@ These are repo-wide rules; tasks reference them rather than restate them.
 
 ### Identifiers and naming
 
-- The project name in code is **`talos`** (matching `v1-architecture.md`). The agreed rename to **Talos** is deferred — see `../README.md` §10. Module names (`talos-api`, `talos-plugin-api`, etc.), package paths (`com.talos.*`), the binary name (`talos run`), the data dir (`~/.talos/`), and class names (`TalosAgent`, `TalosPlugin`, `TalosException`, `TalosConfig`) all stay `talos`. The rename will be one coordinated sweep at the end.
+- The project name in code is **`hebe`** (matching `v1-architecture.md`). The agreed rename to **Hebe** is deferred — see `../README.md` §10. Module names (`hebe-api`, `hebe-plugin-api`, etc.), package paths (`com.hebe.*`), the binary name (`hebe run`), the data dir (`~/.hebe/`), and class names (`HebeAgent`, `HebePlugin`, `HebeException`, `HebeConfig`) all stay `hebe`. The rename will be one coordinated sweep at the end.
 - Module Gradle paths: `:modules:api`, `:modules:plugin-api`, `:modules:core`, etc.
-- Package paths follow module structure: `com.talos.api`, `com.talos.plugin`, `com.talos.core`, etc.
-- Test packages mirror main: tests for `com.talos.api.X` live in `modules/api/src/test/kotlin/com/talos/api/XTest.kt`.
+- Package paths follow module structure: `com.hebe.api`, `com.hebe.plugin`, `com.hebe.core`, etc.
+- Test packages mirror main: tests for `com.hebe.api.X` live in `modules/api/src/test/kotlin/com/hebe/api/XTest.kt`.
 
 ### Code style
 
@@ -93,7 +93,7 @@ The following commands appear repeatedly and should always work after each task:
 | `./gradlew detekt` | Static analysis clean |
 | `./gradlew ktlintCheck` | Format clean |
 | `./gradlew shadowJar` | Fat JAR produced (after M9.T6) |
-| `./gradlew :modules:cli-app:run --args="..."` | Run talos from source |
+| `./gradlew :modules:cli-app:run --args="..."` | Run hebe from source |
 
 ### Module dependency rules (recap)
 
@@ -112,11 +112,11 @@ The following commands appear repeatedly and should always work after each task:
 | Term | Meaning |
 |---|---|
 | **Kernel ABI** | The five interfaces in `modules/api`: `LlmProvider`, `Channel`, `Tool`, `MemoryStore`, `Observer`. Plus supporting types. |
-| **Plugin ABI** | `TalosPlugin`, `PluginHost`, `Capability`, `Permission` in `modules/plugin-api`. |
+| **Plugin ABI** | `HebePlugin`, `PluginHost`, `Capability`, `Permission` in `modules/plugin-api`. |
 | **Dispatcher / mutation funnel** | `ToolDispatcher.dispatch`. The single entry point through which any side-effect happens. |
 | **Loop driver** | `runAgenticLoop(delegate, …)` — the shared per-turn driver. |
-| **Receipts** | NDJSON Ed25519-chained log at `~/.talos/receipts/YYYY-MM.log`. |
-| **Workspace** | `~/.talos/workspace/` — markdown filesystem. |
+| **Receipts** | NDJSON Ed25519-chained log at `~/.hebe/receipts/YYYY-MM.log`. |
+| **Workspace** | `~/.hebe/workspace/` — markdown filesystem. |
 | **Routine** | Cron-driven entry that fires a tool or skill. |
 | **Maintenance job** | Built-in routine (summarisation, fact extraction, etc.). |
 | **Capability** | What a plugin contributes (`tool`, `skill`). |

@@ -25,9 +25,9 @@ Lay out an empty multi-module Gradle build matching `v1-architecture.md` §1. Af
 - `build.gradle.kts` (new — root)
 - `build-logic/settings.gradle.kts` (new — Gradle convention plugins live here)
 - `build-logic/build.gradle.kts` (new)
-- `build-logic/src/main/kotlin/talos.base.gradle.kts` (new)
-- `build-logic/src/main/kotlin/talos.library.gradle.kts` (new)
-- `build-logic/src/main/kotlin/talos.application.gradle.kts` (new)
+- `build-logic/src/main/kotlin/hebe.base.gradle.kts` (new)
+- `build-logic/src/main/kotlin/hebe.library.gradle.kts` (new)
+- `build-logic/src/main/kotlin/hebe.application.gradle.kts` (new)
 - `modules/api/build.gradle.kts` (new)
 - `modules/plugin-api/build.gradle.kts` (new)
 - `modules/observability/build.gradle.kts` (new)
@@ -52,7 +52,7 @@ Lay out an empty multi-module Gradle build matching `v1-architecture.md` §1. Af
 - `modules/<each>/src/main/kotlin/.gitkeep` (new)
 - `modules/<each>/src/test/kotlin/.gitkeep` (new)
 - `gradle/libs.versions.toml` (edit — placeholders only; real content in M0.T2)
-- `.gitignore` (edit — add `build/`, `.idea/`, `*.log`, `~/.talos/`)
+- `.gitignore` (edit — add `build/`, `.idea/`, `*.log`, `~/.hebe/`)
 
 ### Detailed work
 
@@ -75,7 +75,7 @@ Lay out an empty multi-module Gradle build matching `v1-architecture.md` §1. Af
        }
    }
 
-   rootProject.name = "talos"
+   rootProject.name = "hebe"
 
    include(
        ":modules:api",
@@ -102,7 +102,7 @@ Lay out an empty multi-module Gradle build matching `v1-architecture.md` §1. Af
    )
    ```
 
-3. **Convention plugin `talos.base.gradle.kts`**:
+3. **Convention plugin `hebe.base.gradle.kts`**:
 
    ```kotlin
    plugins {
@@ -133,13 +133,13 @@ Lay out an empty multi-module Gradle build matching `v1-architecture.md` §1. Af
    }
    ```
 
-4. **`talos.library.gradle.kts`** applies `talos.base` and adds nothing extra in v1 (publishing config later).
+4. **`hebe.library.gradle.kts`** applies `hebe.base` and adds nothing extra in v1 (publishing config later).
 
-5. **`talos.application.gradle.kts`** applies `talos.base` plus the Shadow plugin (skeleton; M9.T6 fills in the manifest):
+5. **`hebe.application.gradle.kts`** applies `hebe.base` plus the Shadow plugin (skeleton; M9.T6 fills in the manifest):
 
    ```kotlin
    plugins {
-       id("talos.base")
+       id("hebe.base")
        application
        id("com.github.johnrengelman.shadow")
    }
@@ -149,9 +149,9 @@ Lay out an empty multi-module Gradle build matching `v1-architecture.md` §1. Af
 
    ```kotlin
    plugins {
-       id("talos.base") apply false
-       id("talos.library") apply false
-       id("talos.application") apply false
+       id("hebe.base") apply false
+       id("hebe.library") apply false
+       id("hebe.application") apply false
    }
    ```
 
@@ -159,13 +159,13 @@ Lay out an empty multi-module Gradle build matching `v1-architecture.md` §1. Af
 
    ```kotlin
    plugins {
-       id("talos.library")
+       id("hebe.library")
    }
 
    // module-specific deps go here in later tasks
    ```
 
-   `modules/cli-app/build.gradle.kts` uses `talos.application` instead.
+   `modules/cli-app/build.gradle.kts` uses `hebe.application` instead.
 
 8. Create the `src/main/kotlin/.gitkeep` and `src/test/kotlin/.gitkeep` for every module so Gradle treats them as real source sets.
 
@@ -178,7 +178,7 @@ Lay out an empty multi-module Gradle build matching `v1-architecture.md` §1. Af
 ### Acceptance criteria
 
 - ✅ `settings.gradle.kts` declares all 23 modules from `v1-architecture.md` §1.
-- ✅ Convention plugins live under `build-logic/` and are applied via `id("talos.base")` etc.
+- ✅ Convention plugins live under `build-logic/` and are applied via `id("hebe.base")` etc.
 - ✅ `./gradlew build` is green on a clean checkout.
 - ✅ JVM toolchain is set to 21 in the convention plugin.
 - ✅ Detekt + ktlint plugins applied (real config follows in M0.T3).
@@ -356,7 +356,7 @@ Populate the version catalogue so any module can declare deps as `libs.kotlinx.c
 
 - `config/detekt/detekt.yml` (new)
 - `config/detekt/baseline.xml` (new — empty XML root)
-- `build-logic/src/main/kotlin/talos.base.gradle.kts` (edit — wire config files)
+- `build-logic/src/main/kotlin/hebe.base.gradle.kts` (edit — wire config files)
 - `.editorconfig` (new — ktlint reads this)
 
 ### Detailed work
@@ -367,7 +367,7 @@ Populate the version catalogue so any module can declare deps as `libs.kotlinx.c
    - `naming.FunctionNaming` allows backtick test names.
    - `formatting` left to ktlint (disable formatting rules in detekt).
 
-2. Wire detekt into `talos.base.gradle.kts`:
+2. Wire detekt into `hebe.base.gradle.kts`:
 
    ```kotlin
    detekt {
@@ -524,15 +524,15 @@ Implement the kernel ABI as described in `v1-architecture.md` §3. Pure interfac
 ### Files to create
 
 - `modules/api/build.gradle.kts` (edit — add deps)
-- `modules/api/src/main/kotlin/com/talos/api/LlmProvider.kt` (new)
-- `modules/api/src/main/kotlin/com/talos/api/Tool.kt` (new)
-- `modules/api/src/main/kotlin/com/talos/api/Channel.kt` (new)
-- `modules/api/src/main/kotlin/com/talos/api/MemoryStore.kt` (new)
-- `modules/api/src/main/kotlin/com/talos/api/Observer.kt` (new)
-- `modules/api/src/main/kotlin/com/talos/api/Submission.kt` (new)
-- `modules/api/src/main/kotlin/com/talos/api/HandleOutcome.kt` (new)
-- `modules/api/src/main/kotlin/com/talos/api/Common.kt` (new — shared types: Attachment, JsonObject re-exports if needed)
-- `modules/api/src/main/kotlin/com/talos/api/Errors.kt` (new — `TalosException` sealed hierarchy from arch §20)
+- `modules/api/src/main/kotlin/com/hebe/api/LlmProvider.kt` (new)
+- `modules/api/src/main/kotlin/com/hebe/api/Tool.kt` (new)
+- `modules/api/src/main/kotlin/com/hebe/api/Channel.kt` (new)
+- `modules/api/src/main/kotlin/com/hebe/api/MemoryStore.kt` (new)
+- `modules/api/src/main/kotlin/com/hebe/api/Observer.kt` (new)
+- `modules/api/src/main/kotlin/com/hebe/api/Submission.kt` (new)
+- `modules/api/src/main/kotlin/com/hebe/api/HandleOutcome.kt` (new)
+- `modules/api/src/main/kotlin/com/hebe/api/Common.kt` (new — shared types: Attachment, JsonObject re-exports if needed)
+- `modules/api/src/main/kotlin/com/hebe/api/Errors.kt` (new — `HebeException` sealed hierarchy from arch §20)
 - Test scaffolding: at least one round-trip serialisation test per data class
 
 ### Detailed work
@@ -541,7 +541,7 @@ Implement the kernel ABI as described in `v1-architecture.md` §3. Pure interfac
 
    ```kotlin
    plugins {
-       id("talos.library")
+       id("hebe.library")
        alias(libs.plugins.kotlin.serialization)
    }
 
@@ -558,19 +558,19 @@ Implement the kernel ABI as described in `v1-architecture.md` §3. Pure interfac
 
 3. For `StreamEvent`, `ToolResult`, `Submission`, `HandleOutcome`, `PendingReason`, `ChatMessage`, `ToolChoice`, `ExternalThreadId`, `ObserverEvent` — use `sealed` interface or class with `@Serializable` and `@SerialName` on each variant.
 
-4. `TalosException` should be a sealed `Exception` hierarchy. Match arch §20 exactly:
+4. `HebeException` should be a sealed `Exception` hierarchy. Match arch §20 exactly:
 
    ```kotlin
-   sealed class TalosException(message: String, cause: Throwable? = null) : Exception(message, cause) {
-       class Config(message: String) : TalosException(message)
-       class Provider(val retriable: Boolean, message: String, cause: Throwable? = null) : TalosException(message, cause)
-       class Tool(val tool: String, val retriable: Boolean, message: String) : TalosException(message)
-       class Plugin(val pluginId: String, message: String, cause: Throwable? = null) : TalosException(message, cause)
-       class Security(message: String) : TalosException(message)
-       class PolicyDenied(message: String) : TalosException(message)
-       class Approval(message: String) : TalosException(message)
-       class Memory(message: String) : TalosException(message)
-       class Channel(val channel: String, message: String, cause: Throwable? = null) : TalosException(message, cause)
+   sealed class HebeException(message: String, cause: Throwable? = null) : Exception(message, cause) {
+       class Config(message: String) : HebeException(message)
+       class Provider(val retriable: Boolean, message: String, cause: Throwable? = null) : HebeException(message, cause)
+       class Tool(val tool: String, val retriable: Boolean, message: String) : HebeException(message)
+       class Plugin(val pluginId: String, message: String, cause: Throwable? = null) : HebeException(message, cause)
+       class Security(message: String) : HebeException(message)
+       class PolicyDenied(message: String) : HebeException(message)
+       class Approval(message: String) : HebeException(message)
+       class Memory(message: String) : HebeException(message)
+       class Channel(val channel: String, message: String, cause: Throwable? = null) : HebeException(message, cause)
    }
    ```
 
@@ -582,7 +582,7 @@ Implement the kernel ABI as described in `v1-architecture.md` §3. Pure interfac
 
 - `./gradlew :modules:api:test` passes.
 - `./gradlew :modules:api:detekt` clean.
-- A consumer module (test-only, in this task) can `import com.talos.api.*` and reference types.
+- A consumer module (test-only, in this task) can `import com.hebe.api.*` and reference types.
 
 ### Acceptance criteria
 
@@ -617,14 +617,14 @@ Implement the plugin-author-facing ABI from `v1-architecture.md` §4. This modul
 ### Files to create
 
 - `modules/plugin-api/build.gradle.kts` (edit)
-- `modules/plugin-api/src/main/kotlin/com/talos/plugin/TalosPlugin.kt` (new)
-- `modules/plugin-api/src/main/kotlin/com/talos/plugin/PluginHost.kt` (new)
-- `modules/plugin-api/src/main/kotlin/com/talos/plugin/PluginManifest.kt` (new)
-- `modules/plugin-api/src/main/kotlin/com/talos/plugin/Capability.kt` (new — enum)
-- `modules/plugin-api/src/main/kotlin/com/talos/plugin/Permission.kt` (new — sealed)
-- `modules/plugin-api/src/main/kotlin/com/talos/plugin/SecretHandle.kt` (new — value class)
-- `modules/plugin-api/src/main/kotlin/com/talos/plugin/HttpResponse.kt` (new)
-- `modules/plugin-api/src/main/kotlin/com/talos/plugin/PluginCapabilityException.kt` (new)
+- `modules/plugin-api/src/main/kotlin/com/hebe/plugin/HebePlugin.kt` (new)
+- `modules/plugin-api/src/main/kotlin/com/hebe/plugin/PluginHost.kt` (new)
+- `modules/plugin-api/src/main/kotlin/com/hebe/plugin/PluginManifest.kt` (new)
+- `modules/plugin-api/src/main/kotlin/com/hebe/plugin/Capability.kt` (new — enum)
+- `modules/plugin-api/src/main/kotlin/com/hebe/plugin/Permission.kt` (new — sealed)
+- `modules/plugin-api/src/main/kotlin/com/hebe/plugin/SecretHandle.kt` (new — value class)
+- `modules/plugin-api/src/main/kotlin/com/hebe/plugin/HttpResponse.kt` (new)
+- `modules/plugin-api/src/main/kotlin/com/hebe/plugin/PluginCapabilityException.kt` (new)
 - Tests: serialisation round-trips for `PluginManifest`, etc.
 
 ### Detailed work
@@ -633,7 +633,7 @@ Implement the plugin-author-facing ABI from `v1-architecture.md` §4. This modul
 
    ```kotlin
    plugins {
-       id("talos.library")
+       id("hebe.library")
        alias(libs.plugins.kotlin.serialization)
    }
 
@@ -643,10 +643,10 @@ Implement the plugin-author-facing ABI from `v1-architecture.md` §4. This modul
    }
    ```
 
-2. `TalosPlugin`:
+2. `HebePlugin`:
 
    ```kotlin
-   abstract class TalosPlugin(wrapper: org.pf4j.PluginWrapper) : org.pf4j.Plugin(wrapper) {
+   abstract class HebePlugin(wrapper: org.pf4j.PluginWrapper) : org.pf4j.Plugin(wrapper) {
        open fun tools(host: PluginHost): List<Tool> = emptyList()
        open fun channels(host: PluginHost): List<Channel> = emptyList()
        open fun memoryStores(host: PluginHost): List<MemoryStore> = emptyList()
@@ -688,7 +688,7 @@ Implement the plugin-author-facing ABI from `v1-architecture.md` §4. This modul
    ```kotlin
    @Serializable
    data class PluginManifest(
-       val talosApiVersion: String,
+       val hebeApiVersion: String,
        val capabilities: Set<Capability>,
        val permissions: Set<Permission>,
        val allowlistDomains: List<String>,
@@ -702,12 +702,12 @@ Implement the plugin-author-facing ABI from `v1-architecture.md` §4. This modul
 ### Tests / verification
 
 - Round-trip serialisation tests for `PluginManifest` and each `Permission` subtype.
-- Smoke test: instantiate a synthetic `TalosPlugin` subclass; call default methods; observe empty lists returned.
+- Smoke test: instantiate a synthetic `HebePlugin` subclass; call default methods; observe empty lists returned.
 
 ### Acceptance criteria
 
 - ✅ Module compiles with deps `api` + `pf4j` only (verified).
-- ✅ A plugin author can write `class MyPlugin(wrapper) : TalosPlugin(wrapper) { override fun tools(host) = listOf(...) }` against this module alone.
+- ✅ A plugin author can write `class MyPlugin(wrapper) : HebePlugin(wrapper) { override fun tools(host) = listOf(...) }` against this module alone.
 - ✅ `PluginManifest` round-trips through JSON.
 
 ### Pitfalls
@@ -732,14 +732,14 @@ Implement the plugin-author-facing ABI from `v1-architecture.md` §4. This modul
 
 ### Goal
 
-Wire up logback with the JSON encoder and the talos `Observer` interface backed by both OTel spans and an in-memory ring buffer (for `talos doctor --verbose`).
+Wire up logback with the JSON encoder and the hebe `Observer` interface backed by both OTel spans and an in-memory ring buffer (for `hebe doctor --verbose`).
 
 ### Files to create
 
 - `modules/observability/build.gradle.kts` (edit)
-- `modules/observability/src/main/kotlin/com/talos/observability/LogbackObserver.kt` (new)
-- `modules/observability/src/main/kotlin/com/talos/observability/RingBuffer.kt` (new)
-- `modules/observability/src/main/kotlin/com/talos/observability/SensitiveRedactor.kt` (new — used by both Observer and dispatcher)
+- `modules/observability/src/main/kotlin/com/hebe/observability/LogbackObserver.kt` (new)
+- `modules/observability/src/main/kotlin/com/hebe/observability/RingBuffer.kt` (new)
+- `modules/observability/src/main/kotlin/com/hebe/observability/SensitiveRedactor.kt` (new — used by both Observer and dispatcher)
 - `modules/observability/src/main/resources/logback.xml` (new)
 - Tests: every event variant gets logged in JSON; redactor masks the right keys.
 
@@ -768,7 +768,7 @@ Wire up logback with the JSON encoder and the talos `Observer` interface backed 
            <thread>thread</thread>
            <level>level</level>
          </fieldNames>
-         <customFields>{"app":"talos"}</customFields>
+         <customFields>{"app":"hebe"}</customFields>
        </encoder>
      </appender>
      <root level="info">
@@ -819,15 +819,15 @@ Wire up logback with the JSON encoder and the talos `Observer` interface backed 
 
 ### Goal
 
-Load `~/.talos/config.toml`, validate it, return a typed `TalosConfig`. Bad input produces row/column-pinpointed diagnostics.
+Load `~/.hebe/config.toml`, validate it, return a typed `HebeConfig`. Bad input produces row/column-pinpointed diagnostics.
 
 ### Files to create
 
 - `modules/config/build.gradle.kts` (edit)
-- `modules/config/src/main/kotlin/com/talos/config/TalosConfig.kt` (new — typed projection)
-- `modules/config/src/main/kotlin/com/talos/config/ConfigLoader.kt` (new)
-- `modules/config/src/main/kotlin/com/talos/config/ConfigError.kt` (new — sealed)
-- `modules/config/src/main/kotlin/com/talos/config/Defaults.kt` (new)
+- `modules/config/src/main/kotlin/com/hebe/config/HebeConfig.kt` (new — typed projection)
+- `modules/config/src/main/kotlin/com/hebe/config/ConfigLoader.kt` (new)
+- `modules/config/src/main/kotlin/com/hebe/config/ConfigError.kt` (new — sealed)
+- `modules/config/src/main/kotlin/com/hebe/config/Defaults.kt` (new)
 - Tests: golden config files + bad-input cases
 
 ### Detailed work
@@ -841,12 +841,12 @@ Load `~/.talos/config.toml`, validate it, return a typed `TalosConfig`. Bad inpu
    }
    ```
 
-2. `TalosConfig` should mirror the schema in `v1-architecture.md` §7 exactly. Use nested data classes:
+2. `HebeConfig` should mirror the schema in `v1-architecture.md` §7 exactly. Use nested data classes:
 
    ```kotlin
    @Serializable
-   data class TalosConfig(
-       val talos: General,
+   data class HebeConfig(
+       val hebe: General,
        val llm: Llm,
        val autonomy: Autonomy,
        val security: Security,
@@ -863,25 +863,25 @@ Load `~/.talos/config.toml`, validate it, return a typed `TalosConfig`. Bad inpu
    }
    ```
 
-3. `ConfigLoader.load(path: Path): Result<TalosConfig, List<ConfigError>>`:
+3. `ConfigLoader.load(path: Path): Result<HebeConfig, List<ConfigError>>`:
    - Reads the file with `tomlj`.
    - For each required key, look it up; on miss, emit `ConfigError.Missing(path, key, line=…, col=…)` using `tomlj`'s position info.
    - Resolve `${ENV_VAR}` references in string values. If a referenced env var is missing, emit `ConfigError.UnresolvedEnv`.
    - Type checks: cron expressions parsed (via M8's parser later — for v1 stub, just regex-validate `^[0-9*/,-]+( [0-9*/,-]+){4}$`).
 
-4. `Defaults` provides a `TalosConfig.minimal(dataDir)` used by the onboarding wizard (M9.T4) to write a starter file.
+4. `Defaults` provides a `HebeConfig.minimal(dataDir)` used by the onboarding wizard (M9.T4) to write a starter file.
 
-5. Diagnostics: every `ConfigError` includes `line` + `col`. Format errors as `~/.talos/config.toml:42:5 — missing required key 'llm.base_url'`.
+5. Diagnostics: every `ConfigError` includes `line` + `col`. Format errors as `~/.hebe/config.toml:42:5 — missing required key 'llm.base_url'`.
 
 ### Tests / verification
 
-- Golden test: a minimal valid `config.toml` loads; round-trip through `TalosConfig.toToml()` (if implemented) matches.
+- Golden test: a minimal valid `config.toml` loads; round-trip through `HebeConfig.toToml()` (if implemented) matches.
 - Bad input: missing key → error with right line/col. Invalid type → error.
 - Env-ref test: `api_key_secret = "${MY_KEY}"` resolved when env var set; flagged when not.
 
 ### Acceptance criteria
 
-- ✅ All keys from arch §7 modelled in `TalosConfig`.
+- ✅ All keys from arch §7 modelled in `HebeConfig`.
 - ✅ Bad config produces row/col diagnostics.
 - ✅ Env-ref resolution tested.
 
@@ -909,13 +909,13 @@ Implement `SecretStore` backed by AES-256-GCM-encrypted SQLite. Master key in OS
 
 ### Files to create
 
-- `modules/config/src/main/kotlin/com/talos/config/secrets/SecretStore.kt` (new — interface)
-- `modules/config/src/main/kotlin/com/talos/config/secrets/SqliteSecretStore.kt` (new — impl)
-- `modules/config/src/main/kotlin/com/talos/config/secrets/MasterKeyResolver.kt` (new)
-- `modules/config/src/main/kotlin/com/talos/config/secrets/MacKeychain.kt` (new — JNA against `Security.framework` or shell-out to `security`)
-- `modules/config/src/main/kotlin/com/talos/config/secrets/LinuxSecretService.kt` (new — `libsecret` via `secret-tool` shell-out)
-- `modules/config/src/main/kotlin/com/talos/config/secrets/WindowsCredentialManager.kt` (new — JNA `Advapi32`)
-- `modules/config/src/main/kotlin/com/talos/config/secrets/PassphraseFallback.kt` (new)
+- `modules/config/src/main/kotlin/com/hebe/config/secrets/SecretStore.kt` (new — interface)
+- `modules/config/src/main/kotlin/com/hebe/config/secrets/SqliteSecretStore.kt` (new — impl)
+- `modules/config/src/main/kotlin/com/hebe/config/secrets/MasterKeyResolver.kt` (new)
+- `modules/config/src/main/kotlin/com/hebe/config/secrets/MacKeychain.kt` (new — JNA against `Security.framework` or shell-out to `security`)
+- `modules/config/src/main/kotlin/com/hebe/config/secrets/LinuxSecretService.kt` (new — `libsecret` via `secret-tool` shell-out)
+- `modules/config/src/main/kotlin/com/hebe/config/secrets/WindowsCredentialManager.kt` (new — JNA `Advapi32`)
+- `modules/config/src/main/kotlin/com/hebe/config/secrets/PassphraseFallback.kt` (new)
 - Tests on a tmp DB
 
 ### Detailed work
@@ -937,7 +937,7 @@ Implement `SecretStore` backed by AES-256-GCM-encrypted SQLite. Master key in OS
    3. If neither works, prompt the user (CLI-only path; raise if no TTY).
 
 3. `SqliteSecretStore`:
-   - Opens `~/.talos/secrets.db`.
+   - Opens `~/.hebe/secrets.db`.
    - Single table:
      ```sql
      CREATE TABLE secrets (
@@ -950,9 +950,9 @@ Implement `SecretStore` backed by AES-256-GCM-encrypted SQLite. Master key in OS
    - On `put`: generate a random 12-byte nonce, encrypt with AES-256-GCM, insert.
    - On `get`: decrypt; null if not found.
 
-4. `MacKeychain` simplest impl: shell out to `security add-generic-password -a talos -s talos-master -w <key>` and `security find-generic-password -a talos -s talos-master -w`. Document the JNA path as a v2 cleanup.
+4. `MacKeychain` simplest impl: shell out to `security add-generic-password -a hebe -s hebe-master -w <key>` and `security find-generic-password -a hebe -s hebe-master -w`. Document the JNA path as a v2 cleanup.
 
-5. `LinuxSecretService` shells out to `secret-tool store --label="talos master key" service talos account master`. If `secret-tool` is unavailable, fall back to passphrase file.
+5. `LinuxSecretService` shells out to `secret-tool store --label="hebe master key" service hebe account master`. If `secret-tool` is unavailable, fall back to passphrase file.
 
 6. `WindowsCredentialManager` uses JNA against `Advapi32`'s `CredRead`/`CredWrite`.
 
@@ -996,10 +996,10 @@ Custom Detekt rule that flags any direct write to fields like `state.store`, `st
 ### Files to create
 
 - `modules/detekt-rules/build.gradle.kts` (edit)
-- `modules/detekt-rules/src/main/kotlin/com/talos/detekt/MutationFunnelRule.kt` (new)
+- `modules/detekt-rules/src/main/kotlin/com/hebe/detekt/MutationFunnelRule.kt` (new)
 - `modules/detekt-rules/src/main/resources/META-INF/services/io.gitlab.arturbosch.detekt.api.RuleSetProvider` (new)
-- `modules/detekt-rules/src/main/kotlin/com/talos/detekt/TalosRuleSetProvider.kt` (new)
-- `modules/detekt-rules/src/test/kotlin/com/talos/detekt/MutationFunnelRuleTest.kt` (new)
+- `modules/detekt-rules/src/main/kotlin/com/hebe/detekt/HebeRuleSetProvider.kt` (new)
+- `modules/detekt-rules/src/test/kotlin/com/hebe/detekt/MutationFunnelRuleTest.kt` (new)
 - `config/detekt/detekt.yml` (edit — register the rule set)
 
 ### Detailed work
@@ -1030,8 +1030,8 @@ Custom Detekt rule that flags any direct write to fields like `state.store`, `st
 4. Register via `RuleSetProvider`:
 
    ```kotlin
-   class TalosRuleSetProvider : RuleSetProvider {
-       override val ruleSetId = "talos"
+   class HebeRuleSetProvider : RuleSetProvider {
+       override val ruleSetId = "hebe"
        override fun instance(config: Config) = RuleSet(ruleSetId, listOf(MutationFunnelRule(config)))
    }
    ```
@@ -1041,13 +1041,13 @@ Custom Detekt rule that flags any direct write to fields like `state.store`, `st
 6. Wire into root `config/detekt/detekt.yml`:
 
    ```yaml
-   talos:
+   hebe:
      active: true
      MutationFunnelBypass:
        active: true
    ```
 
-7. In `talos.base.gradle.kts`, add the rule set to the detekt classpath:
+7. In `hebe.base.gradle.kts`, add the rule set to the detekt classpath:
 
    ```kotlin
    dependencies {
@@ -1089,25 +1089,25 @@ Custom Detekt rule that flags any direct write to fields like `state.store`, `st
 
 ### Goal
 
-A `talos` binary stub with all v1 subcommands wired as no-ops, so contributors can run `./talos <subcommand> --help` and see the surface.
+A `hebe` binary stub with all v1 subcommands wired as no-ops, so contributors can run `./hebe <subcommand> --help` and see the surface.
 
 ### Files to create
 
 - `modules/cli-app/build.gradle.kts` (edit)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/Main.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Run.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Onboard.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Service.kt` (new — subgroup with install/start/stop/uninstall)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Doctor.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Tool.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Plugin.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Mcp.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Memory.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Pairing.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Estop.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Status.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Completion.kt` (new)
-- Wrapper script: `talos` (new at repo root)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/Main.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Run.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Onboard.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Service.kt` (new — subgroup with install/start/stop/uninstall)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Doctor.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Tool.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Plugin.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Mcp.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Memory.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Pairing.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Estop.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Status.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Completion.kt` (new)
+- Wrapper script: `hebe` (new at repo root)
 - `gradle/libs.versions.toml` (edit — add clikt)
 
 ### Detailed work
@@ -1125,12 +1125,12 @@ A `talos` binary stub with all v1 subcommands wired as no-ops, so contributors c
 
    ```kotlin
    plugins {
-       id("talos.application")
+       id("hebe.application")
    }
 
    application {
-       mainClass.set("com.talos.cli.MainKt")
-       applicationName = "talos"
+       mainClass.set("com.hebe.cli.MainKt")
+       applicationName = "hebe"
    }
 
    dependencies {
@@ -1144,11 +1144,11 @@ A `talos` binary stub with all v1 subcommands wired as no-ops, so contributors c
 3. `Main.kt`:
 
    ```kotlin
-   class Talos : CliktCommand(name = "talos") {
+   class Hebe : CliktCommand(name = "hebe") {
        override fun run() = Unit
    }
 
-   fun main(args: Array<String>) = Talos()
+   fun main(args: Array<String>) = Hebe()
        .subcommands(
            Run(), Onboard(), Service(), Doctor(),
            Tool(), Plugin(), Mcp(), Memory(),
@@ -1162,14 +1162,14 @@ A `talos` binary stub with all v1 subcommands wired as no-ops, so contributors c
    ```kotlin
    class Run : CliktCommand(name = "run") {
        override fun run() {
-           echo("talos run — not yet implemented")
+           echo("hebe run — not yet implemented")
        }
    }
    ```
 
 5. The `Service` and `Plugin` and `Mcp` commands are command groups with subcommands (e.g. `service install/start/stop/uninstall`). Use clikt's `subcommands()` mechanism.
 
-6. Wrapper script `./talos` (repo root):
+6. Wrapper script `./hebe` (repo root):
 
    ```bash
    #!/usr/bin/env bash
@@ -1181,14 +1181,14 @@ A `talos` binary stub with all v1 subcommands wired as no-ops, so contributors c
 
 ### Tests / verification
 
-- `./talos --help` lists all subcommands.
-- `./talos service --help` shows `install/start/stop/uninstall`.
-- `./talos doctor` exits 0 with the placeholder message.
+- `./hebe --help` lists all subcommands.
+- `./hebe service --help` shows `install/start/stop/uninstall`.
+- `./hebe doctor` exits 0 with the placeholder message.
 
 ### Acceptance criteria
 
 - ✅ Every subcommand from `v1-specs.md` §2.11 wired as a stub.
-- ✅ `./talos --help` shows the surface.
+- ✅ `./hebe --help` shows the surface.
 - ✅ Run via `./gradlew :modules:cli-app:run --args="--help"` also works.
 
 ### Pitfalls

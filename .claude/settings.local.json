@@ -11,7 +11,15 @@
       "Bash(just info *)",
       "Bash(just lint-kt *)",
       "Bash(./gradlew :spike:calcite-v1:test --tests \"spike.calcite.v1.schema.RoundTripSpec\" -i)",
-      "Bash(grep -nE \"^- \\\\[\\(x| |!\\)\\\\] \\(Q[0-9]|Implement|Acceptance|Commit \\\\+ push: \\\\`\\\\[spike\\\\] A\\\\.3\\)\" /Users/bora/Dev/ai-platform/tasks-phase-00.md)"
+      "Bash(grep -nE \"^- \\\\[\\(x| |!\\)\\\\] \\(Q[0-9]|Implement|Acceptance|Commit \\\\+ push: \\\\`\\\\[spike\\\\] A\\\\.3\\)\" /Users/bora/Dev/ai-platform/tasks-phase-00.md)",
+      "Bash(xargs cat)",
+      "Bash(xargs perl -pi -e 's/com\\\\.talos/com.hebe/g;' -e 's/com\\\\/talos\\\\//com\\\\/hebe\\\\//g;' -e 's/TalosPlugin/HebePlugin/g;' -e 's/TalosException/HebeException/g;' -e 's/TalosConfig/HebeConfig/g;' -e 's/TalosCLI/HebeCLI/g;' -e 's/TalosAgent/HebeAgent/g;' -e 's/talos\\\\.base/hebe.base/g;' -e 's/talos\\\\.library/hebe.library/g;' -e 's/talos\\\\.application/hebe.application/g;' -e 's/talos\\\\.secret\\\\./hebe.secret./g;' -e 's/talos\\\\.db/hebe.db/g;' -e 's/talos_api_version/hebe_api_version/g;' -e 's/vnd\\\\.talos\\\\./vnd.hebe./g;' -e 's|~/\\\\.talos|~/.hebe|g;' -e 's/Talos v/Hebe v/g;' -e 's/Talos/Hebe/g;' -e 's/talos/hebe/g;')",
+      "Bash(echo \"perl pass done: $?\")",
+      "Bash(mv talos.base.gradle.kts hebe.base.gradle.kts)",
+      "Bash(mv talos.library.gradle.kts hebe.library.gradle.kts)",
+      "Bash(mv talos.application.gradle.kts hebe.application.gradle.kts)",
+      "Bash(mv talos.sh hebe.sh)",
+      "Bash(ls *.sh)"
     ]
   }
 }

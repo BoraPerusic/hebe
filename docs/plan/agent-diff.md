@@ -1,6 +1,6 @@
 # Agent diff — Claude vs GPT vs Gemini vs MiniMax
 
-A line-by-line comparison of the four drafts the agents produced for talos's first round of architecture/features/brainstorming. Claude is the reference (because the user picked it as the spine of the synthesis); the other three are compared against it.
+A line-by-line comparison of the four drafts the agents produced for hebe's first round of architecture/features/brainstorming. Claude is the reference (because the user picked it as the spine of the synthesis); the other three are compared against it.
 
 The structure:
 
@@ -12,10 +12,10 @@ The structure:
 
 Source files audited:
 
-- `docs/claude/{talos-architecture,talos-features,talos-brainstorming}.md` + `docs/claude/docs/claws/{stack-notes.md,inspirations.md,iron/*,zero/*}`
-- `docs/gpt/{talos-architecture,talos-features,talos-brainstorming}.md` + `docs/gpt/docs/{iron,zero}/*`
-- `docs/gemini/{talos-architecture,talos-features,brainstorming}.md` + `docs/gemini/docs/claws/{iron,zero}/architecture.md`
-- `docs/minimax/{talos-architecture,talos-features,talos-brainstorming}.md` + `docs/minimax/docs/claws/{iron,zero}/README.md`
+- `docs/claude/{hebe-architecture,hebe-features,hebe-brainstorming}.md` + `docs/claude/docs/claws/{stack-notes.md,inspirations.md,iron/*,zero/*}`
+- `docs/gpt/{hebe-architecture,hebe-features,hebe-brainstorming}.md` + `docs/gpt/docs/{iron,zero}/*`
+- `docs/gemini/{hebe-architecture,hebe-features,brainstorming}.md` + `docs/gemini/docs/claws/{iron,zero}/architecture.md`
+- `docs/minimax/{hebe-architecture,hebe-features,hebe-brainstorming}.md` + `docs/minimax/docs/claws/{iron,zero}/README.md`
 
 ---
 
@@ -25,7 +25,7 @@ Source files audited:
 |---|---|---|---|---|
 | **JVM vs Native recommendation** | JVM (closed, two independent constraints) | JVM-first, portability-conscious | JVM (with KMP path) | **Native** (with JVM fallback) |
 | **WASM / plugin sandbox** | Extism on Chicory (WASIp1 + JSON) | Sidecar boundary; "avoid coupling to one in-process WASM engine" | Chicory or GraalVM WASM | Wasmer Kotlin bindings (with process-isolation fallback) |
-| **Agent core framework** | Wrap koog behind a talos facade | "Verify koog surface; wrap it" | Open: bespoke vs framework | Verify koog multiplatform; if not, build own |
+| **Agent core framework** | Wrap koog behind a hebe facade | "Verify koog surface; wrap it" | Open: bespoke vs framework | Verify koog multiplatform; if not, build own |
 | **Kernel ABI surface** | 5 traits (LlmProvider, Channel, Tool, MemoryStore, Observer) | Implicit via module boundaries | Not formally specified | 4 implicit (Provider, Channel, Tool, Memory) |
 | **Module layout depth** | 21 modules, named, dep-flow rules | 14 modules, named | 6 modules | 8 KMP modules with commonMain/jvmMain/nativeMain splits |
 | **Channel scope for v1** | CLI + Web + Slack + TG + WA + Email (6) — but brainstorming pushes this DOWN to "CLI + Web + ONE chat + email" | Web + CLI + Telegram + Slack + Email (5; WhatsApp v2) | Slack + WA + TG + Email + Webhooks | Web + TG + Slack required; Email/WA/Discord high; Signal/Matrix/Teams medium |
@@ -76,10 +76,10 @@ GPT and Claude landed in the same neighbourhood; GPT's draft is more cautious, C
 
 | GPT idea | Where it lands in the synthesis |
 |---|---|
-| **5-tier memory framing** (Tier 0 Live / Tier 1 Transcript / Tier 2 Curated / Tier 3 Derived / Tier 4 Retrieval) with explicit names | Adopted into `talos-architecture.md` §13 as a documentation framing (Claude's draft had the same content but didn't name the tiers). |
+| **5-tier memory framing** (Tier 0 Live / Tier 1 Transcript / Tier 2 Curated / Tier 3 Derived / Tier 4 Retrieval) with explicit names | Adopted into `hebe-architecture.md` §13 as a documentation framing (Claude's draft had the same content but didn't name the tiers). |
 | **Named scheduled-maintenance jobs** (transcript summarisation, fact extraction, daily digest, stale cleanup, embedding refresh, failed-job detection) | Adopted into architecture §13 and features §9. |
 | **"Sidecar boundary" framing for the sandbox** — "the runtime is JVM-first; avoid coupling the first release to a single in-process WASM engine" | Prescient. The user's revised brief (drop WASM) lands GPT's framing exactly: MCP **is** the sidecar boundary now. |
-| **Module-naming convention** (`talos-domain`, `talos-runtime`, `talos-providers-api`, etc.) | Named slightly differently from Claude's `modules/api`, `core/`, `tools/`, `providers/`, but the cuts are the same. We've kept Claude's names; GPT's naming is more verbose. |
+| **Module-naming convention** (`hebe-domain`, `hebe-runtime`, `hebe-providers-api`, etc.) | Named slightly differently from Claude's `modules/api`, `core/`, `tools/`, `providers/`, but the cuts are the same. We've kept Claude's names; GPT's naming is more verbose. |
 | **"Single-user first, not multi-tenant first"** — bold and explicit | Folded into brainstorming §3.2 as the lean. |
 | **"Optional sidecar or worker boundary for WASM and risky execution"** | Adopted as the v2 plan for shell/browser/kubectl native exec. |
 | **"Recommended first-wave channels: Web, CLI, Telegram, Slack, Email"** with WhatsApp explicitly slipped | Adopted in architecture and features (was already Claude's bias in brainstorming, but GPT was more concrete). |
@@ -102,7 +102,7 @@ GPT and Claude landed in the same neighbourhood; GPT's draft is more cautious, C
 - **No skill-selector specifics.** Claude ports IronClaw's deterministic prefilter (with scoring formula); GPT says "Markdown-based skill definitions plus tool and requirement metadata" — leaves the selection algorithm open.
 - **No compaction threshold.** Claude picks 60%; GPT doesn't specify.
 - **No loop detector.** Claude has it explicitly; GPT doesn't mention it.
-- **`MemoryStore` as a trait isn't called out as a kernel-ABI extension point** — GPT discusses `talos-memory` as a module but not as a pluggable interface in the Hermes sense.
+- **`MemoryStore` as a trait isn't called out as a kernel-ABI extension point** — GPT discusses `hebe-memory` as a module but not as a pluggable interface in the Hermes sense.
 - **Doesn't engage with WASM constraints.** GPT punts ("avoid coupling to a single in-process WASM engine") without working through whether WASM was tractable on JVM in 2026 — Claude's `stack-notes.md` does the actual research.
 
 #### Verdict on GPT
@@ -117,7 +117,7 @@ Gemini's docs are sketches, not drafts. Total volume is ~250 lines vs Claude's ~
 
 | Gemini idea | Where it lands |
 |---|---|
-| **JSR-223 Kotlin scripting for trusted scripts vs WASM for untrusted** | Conceptually relevant under the new direction (no WASM): we could ship a "trusted Kotlin script tool" via JSR-223 (`KotlinScriptEngine`) for rapid in-tree scripting. Listed in `talos-features.md` as a possible follow-up, not v1. |
+| **JSR-223 Kotlin scripting for trusted scripts vs WASM for untrusted** | Conceptually relevant under the new direction (no WASM): we could ship a "trusted Kotlin script tool" via JSR-223 (`KotlinScriptEngine`) for rapid in-tree scripting. Listed in `hebe-features.md` as a possible follow-up, not v1. |
 | **Hermes-style self-evolution: agent writes its own `.kts` tools when it encounters errors** | Captured as a [L] stretch idea in features §4 and stretch-ideas §5. |
 | **JGit (Eclipse) for in-process Git operations** + **Fabric8 for K8s** | Adopted as the v1 implementation path for the `git` and `kubectl` tools (architecture §11 and features §5). |
 | **Inline `[Approve]` / `[Deny]` buttons on Telegram/Slack for high-risk approval flows** | Added to features §7 as v2. |
@@ -132,7 +132,7 @@ Gemini's docs are sketches, not drafts. Total volume is ~250 lines vs Claude's ~
 #### What Gemini got wrong (or weaker than Claude)
 
 - **Recommends Postgres + pgvector as if it's a foregone conclusion.** Misses SQLite + sqlite-vec entirely.
-- **Lists 6 modules (`talos-core`, `talos-providers`, `talos-channels`, `talos-memory`, `talos-tools`, `talos-gateway`).** Claude's 21 modules and GPT's 14 are more realistic for a project this size. Gemini's six are too coarse — `talos-tools` would have to contain the dispatcher, the WASM runtime, the MCP client, and every built-in tool, which is a maintenance disaster.
+- **Lists 6 modules (`hebe-core`, `hebe-providers`, `hebe-channels`, `hebe-memory`, `hebe-tools`, `hebe-gateway`).** Claude's 21 modules and GPT's 14 are more realistic for a project this size. Gemini's six are too coarse — `hebe-tools` would have to contain the dispatcher, the WASM runtime, the MCP client, and every built-in tool, which is a maintenance disaster.
 - **No kernel ABI specification.**
 - **No memory tiering.**
 - **No tool receipts.**
@@ -156,7 +156,7 @@ MiniMax wrote a comprehensive features list (longer than Claude's), but its arch
 | **"Everything Goes Through Tools" (H4)** — explicit pushback that ALL mutations go through `ToolDispatcher` | Same idea as IronClaw's load-bearing rule and Claude's §2.4. MiniMax independently arrived at it — strong signal we should commit. |
 | **"Preemptive History Pruning" (H8)** — trim history BEFORE it overflows, not after | Adopted into architecture §13 ("Preemptive history pruning") and features §3. |
 | **"Loop Detector" (H7)** — duplicate-tool-call fingerprinting, ZeroClaw-style | Same as Claude's loop-detector spec; reinforces that we should ship it v1. |
-| **"Time decay on non-Core memories" (H6)** | Listed as v2 feature in `talos-features.md` §9. |
+| **"Time decay on non-Core memories" (H6)** | Listed as v2 feature in `hebe-features.md` §9. |
 | **"Response cache with deterministic key (temperature=0.0 required)" (H5)** | Listed as v1 feature. |
 | **Tool execution pipeline diagram** with SafetyLayer.validate → ToolExecutor.execute → SafetyLayer.sanitizeOutput | Same content as Claude's dispatcher pipeline but broken out as a diagram. |
 | **`tool_search` builtin tool** for deferred MCP tool discovery | Added to features §5 as v2. |
@@ -171,7 +171,7 @@ MiniMax wrote a comprehensive features list (longer than Claude's), but its arch
 
 - **Time decay on memories.** Claude has it as v2 too, but MiniMax frames the *mechanism* better (older items score lower, no manual pruning).
 - **Tool versioning + rollback.** Claude lists it under "tool dispatcher logging" but doesn't surface it as a feature; MiniMax names it.
-- **Catchup execution.** Cron jobs that were due during a talos downtime: do they run on startup? MiniMax raises this; Claude doesn't.
+- **Catchup execution.** Cron jobs that were due during a hebe downtime: do they run on startup? MiniMax raises this; Claude doesn't.
 - **`tool_search` for deferred MCP loading.** When MCP servers advertise hundreds of tools, prompt explosion is real. MiniMax's deferred-discovery tool is a useful complement to the `Always`/`Dynamic` filter in Claude's draft.
 - **PID file / daemon mode / auto-start** are operational details that Claude's "service install" subcommand glosses over.
 - **Tunneling (Cloudflare/ngrok/Tailscale/custom)** is a real operator concern that Claude only briefly touches.
@@ -243,7 +243,7 @@ Items where the four agents disagreed substantively. These are where the synthes
 | Web console framework | HTMX or Svelte | Agnostic | Not specified | Ktor + SSE+WS | HTMX or small Svelte (per Claude) |
 | Compaction threshold | 60% default | Not specified | Not specified | "Preemptive" (no number) | 60% default + preemptive pruning |
 | Identity files inventory | Single IDENTITY.md v1; rest deferred | Mentioned generically | Not detailed | All 5 in v1 | Single IDENTITY.md v1 |
-| MCP server (expose talos tools) | First-class day one | M1 | Not explicit | Not explicit | First-class day one |
+| MCP server (expose hebe tools) | First-class day one | M1 | Not explicit | Not explicit | First-class day one |
 | Tool receipts mechanism | Ed25519 chained, on disk | "Tamper-evident later" | Not called out | "Audit log" | Ed25519 chained, on disk |
 
 ---
@@ -263,4 +263,4 @@ A short list of ideas where one specific agent contributed the most useful frami
 
 Use Claude as the spine. Adopt GPT's memory-tier naming and "MCP-as-sidecar" framing. Take MiniMax's preemptive-pruning, time-decay, tool_search, catchup, and tunneling features. Take Gemini's JSR-223 idea as a deferred opt-in. Discard MiniMax's KMP module structure and Native recommendation. Discard Gemini's coarse 6-module layout. Discard GPT's "no kernel ABI specification" reticence — write the five traits.
 
-Where the four agents converged (§4), commit. Where they diverged (§5) and the user has decided, follow the user. Where they diverged and the user hasn't decided (multi-tenant, SOPs, BYO-key vs default), surface the question in `talos-brainstorming.md` and argue for the lean position.
+Where the four agents converged (§4), commit. Where they diverged (§5) and the user has decided, follow the user. Where they diverged and the user hasn't decided (multi-tenant, SOPs, BYO-key vs default), surface the question in `hebe-brainstorming.md` and argue for the lean position.

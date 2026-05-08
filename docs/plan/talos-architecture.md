@@ -1,14 +1,14 @@
-# talos — architecture (synthesis)
+# hebe — architecture (synthesis)
 
 A self-hosted Kotlin/JVM autonomous agent inspired by IronClaw and ZeroClaw, scoped for small-team use.
 
 This document is the synthesised architectural blueprint. It supersedes the per-agent drafts under `docs/claude/`, `docs/gpt/`, `docs/gemini/`, `docs/minimax/`. It uses Claude's draft as the spine and folds in the most useful ideas from the other three. See `docs/plan/agent-diff.md` for the line-by-line comparison.
 
-> **Change vs. the original brief.** The user revised `req.md` after reading the four drafts, then closed the open questions in the brainstorming round (see `talos-brainstorming-responses.md`). Net effect:
+> **Change vs. the original brief.** The user revised `req.md` after reading the four drafts, then closed the open questions in the brainstorming round (see `hebe-brainstorming-responses.md`). Net effect:
 > - **JVM only** — Kotlin/Native is dropped.
 > - **No WASM** — drop Extism/Chicory and the WASIp1 plugin contract.
 > - **Pluggable JVM modules** — third-party extensibility happens through (a) JVM plugin JARs loaded via **PF4J** (manifest + isolated classloaders, distributed via container registry), and (b) MCP servers as a separate process boundary for untrusted code.
-> - **Single user, one process** — no multi-tenant design from day one. Drop `TenantScope` and per-user pairings as architectural concerns; one talos instance per human.
+> - **Single user, one process** — no multi-tenant design from day one. Drop `TenantScope` and per-user pairings as architectural concerns; one hebe instance per human.
 > - **Channels for v1: Web Console + CLI + Telegram.** Email, Slack, WhatsApp pushed out of v1 entirely.
 > - **LLM providers for v1: one OpenAI-compatible client (BYOK).** The user has an internal LLM Gateway that exposes the OpenAI protocol; the same client also covers OpenAI proper, Ollama, OpenRouter, Groq. Anthropic-native, Bedrock, Gemini, etc. all deferred — the gateway abstracts upstream choice.
 > - **SOPs are v2.** v1 ships routines only.
@@ -16,20 +16,20 @@ This document is the synthesised architectural blueprint. It supersedes the per-
 
 ## TL;DR
 
-- **Target: JVM**, single fat-JAR (`talos.jar`). Native-image is a v2 distribution-format optimisation. See `docs/claude/docs/claws/stack-notes.md` for the stack reasoning.
+- **Target: JVM**, single fat-JAR (`hebe.jar`). Native-image is a v2 distribution-format optimisation. See `docs/claude/docs/claws/stack-notes.md` for the stack reasoning.
 - **Kernel ABI: five traits** — `LlmProvider`, `Channel`, `Tool`, `MemoryStore`, `Observer`. Everything else hangs off these. `Plugin` and `PluginHost` live in a sibling `plugin-api` module (not the kernel).
-- **Agent core: koog** (JetBrains) wrapped behind a talos-native facade so we can swap.
+- **Agent core: koog** (JetBrains) wrapped behind a hebe-native facade so we can swap.
 - **Extension model — three concentric rings:**
   1. **In-tree Kotlin modules** (trusted, compiled in).
   2. **JVM plugin JARs via PF4J** (semi-trusted, isolated classloaders + manifest, optional Ed25519 signature, distributed via OCI container registry — typically Azure Container Registry). See §8.
   3. **MCP servers** (untrusted by default, process boundary, transport = stdio/SSE/WS/Streamable HTTP).
 - **Sandbox boundary for risky native execution** (shell, `kubectl`, browser): a thin "sidecar" subprocess wrapper using `firejail`/`bwrap`/Docker where available. v2.
 - **Memory: SQLite** (FTS5 + sqlite-vec) with a markdown workspace. Postgres deferred to v2 (and likely beyond — single-user-one-instance keeps SQLite sufficient).
-- **Channels for v1:** **Web Console + CLI + Telegram.** Email / Slack / WhatsApp deferred. (Confirmed in `talos-brainstorming-responses.md` §1.3 + §7.)
+- **Channels for v1:** **Web Console + CLI + Telegram.** Email / Slack / WhatsApp deferred. (Confirmed in `hebe-brainstorming-responses.md` §1.3 + §7.)
 - **LLM providers for v1:** **one OpenAI-compatible client, BYOK.** The user runs an internal LLM Gateway speaking the OpenAI protocol; the same client also drives OpenAI, Ollama, OpenRouter, Groq. Provider router / fallback / native Anthropic / Bedrock / Gemini all deferred — the gateway is responsible for upstream routing and failover.
-- **Single user, one process.** No `TenantScope`, no multi-user pairings, no per-user agent personas. One talos instance per human; multi-instance deployment is out of scope for the foreseeable future.
+- **Single user, one process.** No `TenantScope`, no multi-user pairings, no per-user agent personas. One hebe instance per human; multi-instance deployment is out of scope for the foreseeable future.
 - **Security:** autonomy levels + workspace boundary + tool receipts (Ed25519, chained) + leak detector + approval gate. OS-level sandbox in v2. Plugin `signature_mode = optional` by default in v1.
-- **MCP: first-class.** Server (expose talos tools) and client (consume external MCP) on day one. With JVM-module plugins now the in-tree path, MCP becomes the primary cross-language extension story.
+- **MCP: first-class.** Server (expose hebe tools) and client (consume external MCP) on day one. With JVM-module plugins now the in-tree path, MCP becomes the primary cross-language extension story.
 - **One mutation funnel** (`ToolDispatcher.dispatch`) lint-enforced from day one. (IronClaw's load-bearing rule; MiniMax also flagged it.)
 
 ## 1. Native vs JVM (the architectural question — closed)
@@ -74,7 +74,7 @@ GraalVM native-image stays open as a v2 distribution-format optimisation — sep
 A multi-module Gradle build. Strict acyclic deps. The plugin host module replaces what was the WASM host in Claude's draft.
 
 ```
-talos/
+hebe/
 ├── settings.gradle.kts
 ├── build.gradle.kts                        ← root: versions, common conventions
 ├── modules/
@@ -113,12 +113,12 @@ talos/
 │   │   └── cli/, web/, telegram/           ← (slack/, email/, whatsapp/ deferred)
 │   ├── providers/
 │   │   └── openai_compat/                  ← single OpenAI-compatible client (BYOK)
-│   ├── mcp_server/                         ← talos-as-MCP-server
+│   ├── mcp_server/                         ← hebe-as-MCP-server
 │   ├── gateway/                            ← Ktor server: console + webhook ingress
 │   ├── scheduler/                          ← cron, routines, heartbeat, SOPs[v2]
 │   ├── config/                             ← TOML schema + secrets store
 │   ├── observability/                      ← OTel adapter
-│   └── cli_app/                            ← `talos` binary entry; argparse; subcommands
+│   └── cli_app/                            ← `hebe` binary entry; argparse; subcommands
 ├── plugin-template/                        ← Gradle template for internal plugin authors
 └── docs/                                   ← architecture, claws, brainstorming, plan
 ```
@@ -186,13 +186,13 @@ We add (in `core/agent/`):
 
 - `Submission` parsing layer (slash-commands, approvals, raw-text) before the dispatcher sees the message — IronClaw pattern, also called out by GPT.
 - `ToolDispatcher.dispatch` — the single mutation funnel.
-- talos-flavoured hooks (`BeforeInbound`, `BeforeToolCall`, `BeforeOutbound`, `OnSessionStart/End`).
+- hebe-flavoured hooks (`BeforeInbound`, `BeforeToolCall`, `BeforeOutbound`, `OnSessionStart/End`).
 - The skill selector (deterministic prefilter — IronClaw style).
 - Cost guard + loop detector + compaction ladder.
 - `ChatDelegate` / `JobDelegate` / `WorkerDelegate` strategy split (IronClaw `LoopDelegate`).
 
 ```kotlin
-class TalosAgent(
+class HebeAgent(
     private val koogAgent: ai.koog.agents.Agent,         // dependency hidden
     private val skillSelector: SkillSelector,
     private val dispatcher: ToolDispatcher,
@@ -262,10 +262,10 @@ One agent loop per session. Parallelism happens at the scheduler level (backgrou
 ## 7. Persistence layout
 
 ```
-~/.talos/
+~/.hebe/
 ├── config.toml                  ← bootstrap config (env-resolvable refs)
 ├── secrets.db                   ← AES-256-GCM encrypted secrets, master key in OS keychain
-├── talos.db                    ← main DB: settings, sessions, memory, jobs
+├── hebe.db                    ← main DB: settings, sessions, memory, jobs
 ├── workspace/                   ← markdown filesystem
 │   ├── README.md
 │   ├── MEMORY.md
@@ -291,18 +291,18 @@ Critical invariant (consistent across all four drafts): **LLM data is never dele
 
 ## 8. The plugin model — JVM modules via PF4J
 
-Plugins extend talos with new tools (and, later, channels / memory / observers). They run inside the talos JVM in an isolated classloader managed by **PF4J** (Plugin Framework for Java), with capabilities gated by manifest declarations.
+Plugins extend hebe with new tools (and, later, channels / memory / observers). They run inside the hebe JVM in an isolated classloader managed by **PF4J** (Plugin Framework for Java), with capabilities gated by manifest declarations.
 
-> **Adoption note.** The first round of this doc proposed a hand-rolled URLClassLoader-based loader with PF4J as a fallback. Closed in `talos-brainstorming-responses.md` §6.2: **adopt PF4J directly.** The reasoning: classloader lifecycles are tricky, plugin discovery semantics are well-trodden ground, and we'd rather spend our novelty budget on the agent loop than on a plugin-loader spike.
+> **Adoption note.** The first round of this doc proposed a hand-rolled URLClassLoader-based loader with PF4J as a fallback. Closed in `hebe-brainstorming-responses.md` §6.2: **adopt PF4J directly.** The reasoning: classloader lifecycles are tricky, plugin discovery semantics are well-trodden ground, and we'd rather spend our novelty budget on the agent loop than on a plugin-loader spike.
 
 ### Layout
 
 PF4J's standard plugin layout:
 
 ```
-~/.talos/plugins/my-plugin-0.1.0/
+~/.hebe/plugins/my-plugin-0.1.0/
 ├── plugin.properties     ← PF4J manifest (id, version, provider, plugin class)
-├── plugin.toml           ← talos manifest (capabilities, permissions, signature)
+├── plugin.toml           ← hebe manifest (capabilities, permissions, signature)
 └── classes/ + lib/       ← compiled classes + bundled deps (PF4J convention)
 ```
 
@@ -315,26 +315,26 @@ Closed in §6.7: **plugins are distributed as OCI artifacts via a container regi
 This shapes the v1 distribution flow:
 
 ```
-talos plugin install <oci-ref>
-  e.g.  talos plugin install acr.example.com/talos-plugins/linear:0.3.1
+hebe plugin install <oci-ref>
+  e.g.  hebe plugin install acr.example.com/hebe-plugins/linear:0.3.1
 
   1. Authenticate to registry (token / managed identity / az login chain).
-  2. Pull OCI artifact → cache under ~/.talos/cache/oci/<sha256>/.
+  2. Pull OCI artifact → cache under ~/.hebe/cache/oci/<sha256>/.
   3. Verify Ed25519 signature against publisher_key (signature_mode permitting).
-  4. Extract into ~/.talos/plugins/<name>-<version>/.
+  4. Extract into ~/.hebe/plugins/<name>-<version>/.
   5. Register with PF4J PluginManager.
-  6. Lifecycle: PF4J `start()` → talos `init(host)` → tool/channel registration.
+  6. Lifecycle: PF4J `start()` → hebe `init(host)` → tool/channel registration.
 ```
 
 We use the [oras](https://oras.land) Java client (or a small wrapper around `ORAS` HTTP) for OCI pulls. ACR-specific auth uses `DefaultAzureCredential` semantics (env vars / managed identity / Azure CLI fallback).
 
 ### Manifest (`plugin.toml`)
 
-This is layered on top of PF4J's `plugin.properties`. PF4J's properties handle `id`, `version`, `provider`, `plugin.class`. Our `plugin.toml` adds talos-specific capability and permission metadata:
+This is layered on top of PF4J's `plugin.properties`. PF4J's properties handle `id`, `version`, `provider`, `plugin.class`. Our `plugin.toml` adds hebe-specific capability and permission metadata:
 
 ```toml
 # Required: ABI pin
-talos_api_version = "0.1.x"
+hebe_api_version = "0.1.x"
 
 # What the plugin contributes
 capabilities = ["tool"]                    # tool | skill (v1); channel | memory | observer (v2/L)
@@ -355,7 +355,7 @@ publisher_key = "hex..."
 ```kotlin
 // modules/plugin-api/  — depends only on api/
 
-abstract class TalosPlugin(wrapper: PluginWrapper) : org.pf4j.Plugin(wrapper) {
+abstract class HebePlugin(wrapper: PluginWrapper) : org.pf4j.Plugin(wrapper) {
     open fun tools(host: PluginHost): List<Tool> = emptyList()
     open fun channels(host: PluginHost): List<Channel> = emptyList()
     open fun memoryStores(host: PluginHost): List<MemoryStore> = emptyList()
@@ -376,10 +376,10 @@ interface PluginHost {
 
 ### Loading mechanism (delegated to PF4J)
 
-- PF4J creates one classloader per plugin; we configure it as **child-first for the plugin's own classes and `lib/` JARs, parent-first for `talos-api` and `talos-plugin-api`**. This prevents transitive-dep collisions with the host while ensuring the plugin sees a single canonical copy of our API types.
-- The host classpath exposed to plugins is **only `talos-api` + `talos-plugin-api`**. `koog`, `slack-bolt`, JDBC drivers, etc. are hidden — plugins that want HTTP go through `host.http()`, not Ktor directly.
-- Plugin discovery: PF4J's annotation-based scan (`@Extension`) for tool/channel implementations, plus the `TalosPlugin.tools()` collection method as the explicit registration path. Both mechanisms work; explicit registration is preferred because it documents the contributions in one place.
-- Lifecycle: PF4J's `created → resolved → started → stopped → unloaded`. We hook `started` to call `TalosPlugin.tools(host)` and register; `stopped` to deregister; `unloaded` to close PF4J's classloader. JVM class unloading is best-effort, so we warn on plugin update that a restart is recommended for prod.
+- PF4J creates one classloader per plugin; we configure it as **child-first for the plugin's own classes and `lib/` JARs, parent-first for `hebe-api` and `hebe-plugin-api`**. This prevents transitive-dep collisions with the host while ensuring the plugin sees a single canonical copy of our API types.
+- The host classpath exposed to plugins is **only `hebe-api` + `hebe-plugin-api`**. `koog`, `slack-bolt`, JDBC drivers, etc. are hidden — plugins that want HTTP go through `host.http()`, not Ktor directly.
+- Plugin discovery: PF4J's annotation-based scan (`@Extension`) for tool/channel implementations, plus the `HebePlugin.tools()` collection method as the explicit registration path. Both mechanisms work; explicit registration is preferred because it documents the contributions in one place.
+- Lifecycle: PF4J's `created → resolved → started → stopped → unloaded`. We hook `started` to call `HebePlugin.tools(host)` and register; `stopped` to deregister; `unloaded` to close PF4J's classloader. JVM class unloading is best-effort, so we warn on plugin update that a restart is recommended for prod.
 
 ### v1 capability set
 
@@ -413,7 +413,7 @@ Unchanged from Claude's draft. Skills are markdown bundles; selection is a deter
 ```
 skills/my-skill/
 ├── SKILL.md               ← required: YAML frontmatter + body
-├── scripts/               ← optional helpers (NOT executed by talos; they're docs)
+├── scripts/               ← optional helpers (NOT executed by hebe; they're docs)
 └── references/            ← optional reference material
 ```
 
@@ -431,9 +431,9 @@ The `ChannelManager` merges N `Flow<IncomingMessage>`s into one and owns an `inj
 - **CLI** — local interactive REPL. Fastest iteration loop while building.
 - **Telegram** — TelegramBots library; webhook + long-poll. Draft-update support via `editMessageText`.
 
-Slack, Email, WhatsApp, Discord are explicitly **not** in v1. The decision (`talos-brainstorming-responses.md` §1.3 + §7) is "ship the core agent loop with one chat channel, add more later." Email and Slack are the most likely v2 additions when the core is steady.
+Slack, Email, WhatsApp, Discord are explicitly **not** in v1. The decision (`hebe-brainstorming-responses.md` §1.3 + §7) is "ship the core agent loop with one chat channel, add more later." Email and Slack are the most likely v2 additions when the core is steady.
 
-Single-user note: because talos runs one-instance-per-human, channel pairing and `allowed_users` allowlists collapse to "is this the configured operator?" The `senderId` / `userId` distinction stays in the data model (we still want to reject DMs from strangers), but there is no multi-user resolution table.
+Single-user note: because hebe runs one-instance-per-human, channel pairing and `allowed_users` allowlists collapse to "is this the configured operator?" The `senderId` / `userId` distinction stays in the data model (we still want to reject DMs from strangers), but there is no multi-user resolution table.
 
 ## 11. Security architecture
 
@@ -451,7 +451,7 @@ Plus cross-cutting:
 - **Prompt-injection guard** — pattern-scan model output before tool dispatch.
 - **Leak detector** — pattern-scan outbound for secret formats; block on hit.
 - **OTP gate** — TOTP per-action, configurable. v2.
-- **Emergency stop** — `talos estop` halts in-flight; resume requires OTP if configured.
+- **Emergency stop** — `hebe estop` halts in-flight; resume requires OTP if configured.
 - **Sensitive-param redaction** — auto-redact known param names in logs/UI.
 
 The risk MiniMax flagged (kubectl is a footgun) sticks: `kubectl` ships as `RiskLevel.High` with `requiresApproval = true` for any mutating verb (`apply`, `delete`, `exec`, `scale`, `patch`, `replace`, `port-forward`, `rollout`, `cordon`, `drain`, `uncordon`, `taint`, `label`). Read-only verbs (`get`, `describe`, `logs`, `top`, `events`, `version`) are `Medium` (auto-allowed in `Supervised`).
@@ -522,7 +522,7 @@ Implemented as `Routine` entries owned by the scheduler.
 
 ## 13a. LLM providers
 
-Closed in `talos-brainstorming-responses.md` §3.4 + §7: **v1 ships one OpenAI-compatible provider client. BYOK.** The user runs an internal LLM Gateway that exposes the OpenAI protocol; the same client also drives OpenAI proper, Ollama, OpenRouter, Groq, and any other OpenAI-compatible endpoint.
+Closed in `hebe-brainstorming-responses.md` §3.4 + §7: **v1 ships one OpenAI-compatible provider client. BYOK.** The user runs an internal LLM Gateway that exposes the OpenAI protocol; the same client also drives OpenAI proper, Ollama, OpenRouter, Groq, and any other OpenAI-compatible endpoint.
 
 ```kotlin
 class OpenAiCompatProvider(
@@ -540,7 +540,7 @@ What this collapses out of v1:
 - ❌ Fallback chain on transport errors — gateway-side concern.
 - ✅ The `LlmProvider` trait stays — wrapping koog into the trait keeps us swap-ready.
 - ✅ Capability check (`streaming?`, `tool_use?`, `multimodal?`) stays — we still need to know what the configured endpoint supports.
-- ✅ Cost tracking (per-call token counts → daily $ budget) stays. The budget is informational at the talos layer; the gateway is the one seeing real provider invoices.
+- ✅ Cost tracking (per-call token counts → daily $ budget) stays. The budget is informational at the hebe layer; the gateway is the one seeing real provider invoices.
 
 Config shape (`config.toml`):
 
@@ -555,10 +555,10 @@ If users without the gateway want to point straight at OpenAI: change `base_url`
 
 ## 14. MCP integration
 
-Both directions, day one. With JVM plugins now the in-tree extension path, MCP becomes the **primary cross-language extension story** — it's how someone in Python/Rust/Go ships capabilities to talos.
+Both directions, day one. With JVM plugins now the in-tree extension path, MCP becomes the **primary cross-language extension story** — it's how someone in Python/Rust/Go ships capabilities to hebe.
 
-- **Server** — talos exposes its built-in tools as an MCP server. Transports: stdio (default), SSE (Ktor extension), WebSocket (Ktor extension), Streamable HTTP. Lets Claude Desktop / Cursor / Windsurf call talos tools.
-- **Client** — talos consumes external MCP servers as tool sources. Tools imported with names prefixed `mcp_<server>_<tool>`.
+- **Server** — hebe exposes its built-in tools as an MCP server. Transports: stdio (default), SSE (Ktor extension), WebSocket (Ktor extension), Streamable HTTP. Lets Claude Desktop / Cursor / Windsurf call hebe tools.
+- **Client** — hebe consumes external MCP servers as tool sources. Tools imported with names prefixed `mcp_<server>_<tool>`.
 
 MCP tool filtering (from ZeroClaw, also called out by MiniMax) prevents prompt-token explosion when MCP servers advertise hundreds of tools:
 
@@ -584,7 +584,7 @@ Ktor server hosting:
 - `GET /api/receipts?since=...` — auditable receipts view
 - `POST /api/webhooks/<channel>/<endpoint>` — channel webhook ingress
 
-Auth: single password by default (HTTP Basic over TLS); OAuth optional in v2. Single-user / single-instance scope (one talos instance per human; not multi-tenant).
+Auth: single password by default (HTTP Basic over TLS); OAuth optional in v2. Single-user / single-instance scope (one hebe instance per human; not multi-tenant).
 
 UI tech: small SPA — HTMX or Svelte. Avoid React — wrong scope.
 
@@ -593,7 +593,7 @@ UI tech: small SPA — HTMX or Svelte. Avoid React — wrong scope.
 ## 16. Boot sequence
 
 1. Parse CLI (subcommand: `run | onboard | service | doctor | tool | plugin | mcp | memory | pairing | estop | status | completion`).
-2. Load `~/.talos/config.toml`.
+2. Load `~/.hebe/config.toml`.
 3. Build `AppComponents`:
    - `ConfigStore`, `SecretsStore` (master key from keychain), `Db`, `Observer`
    - `LlmProvider` (single `OpenAiCompatProvider` instance; BYOK from secrets)
@@ -603,7 +603,7 @@ UI tech: small SPA — HTMX or Svelte. Avoid React — wrong scope.
    - `ToolRegistry` (built-ins + plugin-tools + MCP-client tools)
    - `ToolDispatcher`
    - `SecurityPolicy` (autonomy, workspace, command, prompt-guard, leak-detector)
-   - `TalosAgent` (wraps koog)
+   - `HebeAgent` (wraps koog)
    - `ChannelManager` + each enabled channel (web / cli / telegram) + `injectChannel`
    - `Scheduler` (heartbeat, routines, [v2] SOPs, scheduled memory maintenance)
    - `WebGateway` (Ktor)
@@ -615,21 +615,21 @@ Each `init_*` is module-owned. `cli_app/` only orchestrates.
 ## 17. Distribution
 
 - **Fat JAR** via Gradle Shadow plugin.
-- **`./talos` shell wrapper** that runs `java -jar talos.jar`.
+- **`./hebe` shell wrapper** that runs `java -jar hebe.jar`.
 - **Docker image** in v2.
 - **Native-image (GraalVM)** in v2+ if size/cold-start matter.
-- **Service registration** via `talos service install` — generates and installs systemd unit / launchctl plist / Windows-Service definition.
+- **Service registration** via `hebe service install` — generates and installs systemd unit / launchctl plist / Windows-Service definition.
 
 ## 18. Deferred / parked
 
-- **WIT-typed plugins (component model)** and the entire WASM angle. Decision: not in talos. If we ever need cross-language sandboxing, MCP carries that load.
+- **WIT-typed plugins (component model)** and the entire WASM angle. Decision: not in hebe. If we ever need cross-language sandboxing, MCP carries that load.
 - **SOP engine.** Closed: v2.
 - **Slack, Email, WhatsApp channels.** Closed: not in v1. Email + Slack likely v2; WhatsApp later.
 - **Native Anthropic / Bedrock / Gemini / Azure providers.** Gateway abstracts these; v2+ if we ever drop the gateway assumption.
-- **Provider router and fallback chain.** Gateway concern; not talos's.
-- **Multi-tenant / multi-user.** Closed: out of scope. One talos instance per human. `TenantScope` wrapper dropped from the architecture (was floated in the first round).
+- **Provider router and fallback chain.** Gateway concern; not hebe's.
+- **Multi-tenant / multi-user.** Closed: out of scope. One hebe instance per human. `TenantScope` wrapper dropped from the architecture (was floated in the first round).
 - **Tool versioning + rollback.** Closed: not v1 priority.
-- **Plugin hot-reload.** Closed: not a priority. Plugin updates require a talos restart.
+- **Plugin hot-reload.** Closed: not a priority. Plugin updates require a hebe restart.
 - Knowledge graph, decay, consolidation, conflict, snapshots.
 - Hardware (Peripheral trait, GPIO/I2C/etc).
 - Tauri desktop app.
@@ -638,9 +638,9 @@ Each `init_*` is module-owned. `cli_app/` only orchestrates.
 - ACP — defer; MCP-server overlap covers most use.
 - Hermes-style "self-evolution" (Gemini's agent-writes-its-own-Kotlin-script idea). Interesting but research-quality.
 
-## 19. Comparison summary: where talos lands relative to the claws
+## 19. Comparison summary: where hebe lands relative to the claws
 
-| Dimension | IronClaw | ZeroClaw | talos v1 (this plan) |
+| Dimension | IronClaw | ZeroClaw | hebe v1 (this plan) |
 |---|---|---|---|
 | Language | Rust | Rust | Kotlin/JVM |
 | Plugin sandbox | Wasmtime + WIT/component model | Extism (Wasmtime + WASI P1 + JSON) | **JVM plugin JARs (PF4J + manifest, OCI/ACR distribution) + MCP for untrusted** |

@@ -1,13 +1,13 @@
 # M4 — Built-in tools
 
-Every v1 tool implementing the `Tool` interface, registered with `ToolRegistry`, exercising the dispatcher pipeline. Each tool has a unit test, a receipts entry on success, a `ToolResult.Err` on policy violation, and is enumerable via `talos tool list`.
+Every v1 tool implementing the `Tool` interface, registered with `ToolRegistry`, exercising the dispatcher pipeline. Each tool has a unit test, a receipts entry on success, a `ToolResult.Err` on policy violation, and is enumerable via `hebe tool list`.
 
-**Done when:** every v1 tool has a unit test, a receipts entry on success, a `ToolResult.Err` on policy violation, and `talos tool list` enumerates them with their risk.
+**Done when:** every v1 tool has a unit test, a receipts entry on success, a `ToolResult.Err` on policy violation, and `hebe tool list` enumerates them with their risk.
 
 References: [`../v1-architecture.md`](../v1-architecture.md) §22; [`../v1-specs.md`](../v1-specs.md) §2.6.
 
 > **Convention for every tool**:
-> - Lives under `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/<group>/<Tool>.kt`.
+> - Lives under `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/<group>/<Tool>.kt`.
 > - JSON Schema for `args` written using `kotlinx-serialization` to keep it type-safe (`buildJsonObject { … }`).
 > - `ToolSpec.name` is `snake_case`.
 > - Unit tests at `modules/tools/builtin/src/test/kotlin/...`.
@@ -30,11 +30,11 @@ A workspace-bounded filesystem tool. Markdown/json/yaml/html-aware metadata in r
 ### Files to create
 
 - `modules/tools/builtin/build.gradle.kts` (edit)
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/file/FileSystemReadTool.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/file/FileSystemListTool.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/file/FileSystemGlobTool.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/file/FileSystemWriteTool.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/file/FileSystemAppendTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/file/FileSystemReadTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/file/FileSystemListTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/file/FileSystemGlobTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/file/FileSystemWriteTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/file/FileSystemAppendTool.kt`
 - Tests
 
 ### Detailed work
@@ -120,8 +120,8 @@ Run a shell command via `ProcessBuilder`. Subprocess sandboxing is v2; v1 uses a
 
 ### Files to create
 
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/shell/ShellTool.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/shell/ProcessRunner.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/shell/ShellTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/shell/ProcessRunner.kt`
 - Tests
 
 ### Detailed work
@@ -186,7 +186,7 @@ Generic HTTP client tool for RESTful APIs. Domain-allowlisted, SSRF-safe, with a
 
 ### Files to create
 
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/http/HttpTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/http/HttpTool.kt`
 - Tests
 
 ### Detailed work
@@ -230,14 +230,14 @@ Generic HTTP client tool for RESTful APIs. Domain-allowlisted, SSRF-safe, with a
 
 ### Goal
 
-`WebSearchProvider` trait + Brave (default with API key) + DuckDuckGo (free fallback). Closed in `talos-brainstorming-responses.md` §1.10.
+`WebSearchProvider` trait + Brave (default with API key) + DuckDuckGo (free fallback). Closed in `hebe-brainstorming-responses.md` §1.10.
 
 ### Files to create
 
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/search/WebSearchProvider.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/search/BraveSearchProvider.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/search/DuckDuckGoSearchProvider.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/search/WebSearchTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/search/WebSearchProvider.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/search/BraveSearchProvider.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/search/DuckDuckGoSearchProvider.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/search/WebSearchTool.kt`
 - Tests with recorded fixtures
 
 ### Detailed work
@@ -286,7 +286,7 @@ Generic HTTP client tool for RESTful APIs. Domain-allowlisted, SSRF-safe, with a
 
 ### References
 
-- `talos-brainstorming-responses.md` §1.10
+- `hebe-brainstorming-responses.md` §1.10
 
 ---
 
@@ -303,10 +303,10 @@ Tool surface around `MemoryStore` so the agent can do hybrid search, read docs, 
 
 ### Files to create
 
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/memory/MemorySearchTool.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/memory/MemoryReadTool.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/memory/MemoryWriteTool.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/memory/MemoryTreeTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/memory/MemorySearchTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/memory/MemoryReadTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/memory/MemoryWriteTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/memory/MemoryTreeTool.kt`
 - Tests
 
 ### Detailed work
@@ -349,8 +349,8 @@ A convention layer over `file_system` and `memory_*` for "wiki-style" notes unde
 
 ### Files to create
 
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/wiki/WikiReadTool.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/wiki/WikiWriteTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/wiki/WikiReadTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/wiki/WikiWriteTool.kt`
 - Tests
 
 ### Detailed work
@@ -390,7 +390,7 @@ In-process Git operations via JGit: clone, status, diff, log, branch, commit. **
 
 ### Files to create
 
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/git/GitTool.kt` (multi-verb)
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/git/GitTool.kt` (multi-verb)
 - Tests against a temp Git repo
 
 ### Detailed work
@@ -444,7 +444,7 @@ A separate tool because push needs the user's credential helpers (`osxkeychain`,
 
 ### Files to create
 
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/git/GitPushTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/git/GitPushTool.kt`
 - Tests
 
 ### Detailed work
@@ -484,7 +484,7 @@ GitHub API client for issues, PRs, repo metadata. PAT in secrets store; first us
 
 ### Files to create
 
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/github/GitHubTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/github/GitHubTool.kt`
 - Tests with recorded fixtures
 
 ### Detailed work
@@ -529,7 +529,7 @@ Wraps `kubectl`. Read-only verbs Medium; mutating verbs High + always-approve, p
 
 ### Files to create
 
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/k8s/KubectlTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/k8s/KubectlTool.kt`
 - Tests
 
 ### Detailed work
@@ -575,7 +575,7 @@ Sends a clarifying question via the originating channel; the next inbound from t
 
 ### Files to create
 
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/ask/AskUserTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/ask/AskUserTool.kt`
 - Tests
 
 ### Detailed work
@@ -584,7 +584,7 @@ Sends a clarifying question via the originating channel; the next inbound from t
 
 2. Mechanism: returns `ToolResult.NeedsApproval(prompt = question, payload = {purpose, secretName})`. The dispatcher routes through `ApprovalGate` which delivers the prompt via the originating channel; the operator's reply resumes.
 
-3. For `purpose=credential`: the channel adapter sets `metadata.authMode = true` on the inbound that follows. `SubmissionParser` (M2.T4) routes that as `Submission.AuthMode`, which `TalosAgent` (M2.T13) routes through `M2.T15` to store + resume.
+3. For `purpose=credential`: the channel adapter sets `metadata.authMode = true` on the inbound that follows. `SubmissionParser` (M2.T4) routes that as `Submission.AuthMode`, which `HebeAgent` (M2.T13) routes through `M2.T15` to store + resume.
 
 ### Tests / verification
 
@@ -616,7 +616,7 @@ A tool that creates `routines` rows. Tool exists in v1 even though the routines 
 
 ### Files to create
 
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/schedule/ScheduleTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/schedule/ScheduleTool.kt`
 - Tests
 
 ### Detailed work
@@ -655,9 +655,9 @@ CRUD on the `jobs` table from the agent's perspective. Real execution happens in
 
 ### Files to create
 
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/jobs/JobCreateTool.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/jobs/JobStatusTool.kt`
-- `modules/tools/builtin/src/main/kotlin/com/talos/tools/builtin/jobs/JobCancelTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/jobs/JobCreateTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/jobs/JobStatusTool.kt`
+- `modules/tools/builtin/src/main/kotlin/com/hebe/tools/builtin/jobs/JobCancelTool.kt`
 - Tests
 
 ### Detailed work

@@ -1,6 +1,6 @@
-# talos — architektura v1 (řešení + kontrakty)
+# hebe — architektura v1 (řešení + kontrakty)
 
-Konkrétní kontrakty implementované ve verzi v1. Zatímco dokument [`talos-architecture.md`](talos-architecture.md) slouží jako obecný plán, tento dokument představuje **schéma zapojení** — rozhraní, schémata, životní cykly a taxonomie chyb.
+Konkrétní kontrakty implementované ve verzi v1. Zatímco dokument [`hebe-architecture.md`](hebe-architecture.md) slouží jako obecný plán, tento dokument představuje **schéma zapojení** — rozhraní, schémata, životní cykly a taxonomie chyb.
 
 Dokument je napsán tak, aby přispěvatel mohl převzít konkrétní část a implementovat ji bez nutnosti znovu rozhodovat o její podobě.
 

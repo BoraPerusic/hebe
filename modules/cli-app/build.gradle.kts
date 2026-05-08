@@ -1,11 +1,11 @@
 plugins {
-    id("talos.application")
+    id("hebe.application")
     alias(libs.plugins.kotlin.serialization)
 }
 
 application {
-    mainClass.set("com.talos.cli.MainKt")
-    applicationName = "talos"
+    mainClass.set("com.hebe.cli.MainKt")
+    applicationName = "hebe"
 }
 
 dependencies {

@@ -1,14 +1,14 @@
 # M9 — Operations
 
-`talos doctor`, `service install`, daemon mode + PID, onboarding wizard, OTel wiring, fat-JAR build via Shadow, shell completion, status command.
+`hebe doctor`, `service install`, daemon mode + PID, onboarding wizard, OTel wiring, fat-JAR build via Shadow, shell completion, status command.
 
-**Done when:** a fresh user runs `talos onboard` → `talos service install` → talos comes up under systemd and stays up across a host reboot.
+**Done when:** a fresh user runs `hebe onboard` → `hebe service install` → hebe comes up under systemd and stays up across a host reboot.
 
 References: [`../v1-architecture.md`](../v1-architecture.md) §17; [`../v1-specs.md`](../v1-specs.md) §2.11.
 
 ---
 
-## M9.T1 — `talos doctor`
+## M9.T1 — `hebe doctor`
 
 **Status**: pending  
 **Size**: M  
@@ -21,8 +21,8 @@ A single command that prints `Pass | Warn | Fail` for every operational concern 
 
 ### Files to create
 
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Doctor.kt` (edit — implement)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/doctor/Checks.kt` (new — composable checks)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Doctor.kt` (edit — implement)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/doctor/Checks.kt` (new — composable checks)
 - Tests
 
 ### Detailed work
@@ -77,7 +77,7 @@ A single command that prints `Pass | Warn | Fail` for every operational concern 
 
 ---
 
-## M9.T2 — `talos service install / start / stop / uninstall`
+## M9.T2 — `hebe service install / start / stop / uninstall`
 
 **Status**: pending  
 **Size**: M  
@@ -88,16 +88,16 @@ A single command that prints `Pass | Warn | Fail` for every operational concern 
 
 Generate and install a system service unit. Three platforms in v1:
 
-- macOS: launchd plist at `~/Library/LaunchAgents/com.talos.agent.plist`.
-- Linux: systemd user unit at `~/.config/systemd/user/talos.service`.
+- macOS: launchd plist at `~/Library/LaunchAgents/com.hebe.agent.plist`.
+- Linux: systemd user unit at `~/.config/systemd/user/hebe.service`.
 - Windows: a small Service Control Manager registration via `sc.exe` (best-effort; document if it ships fully working).
 
 ### Files to create
 
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Service.kt` (edit — implement)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/service/MacOsLaunchd.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/service/LinuxSystemd.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/service/WindowsService.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Service.kt` (edit — implement)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/service/MacOsLaunchd.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/service/LinuxSystemd.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/service/WindowsService.kt` (new)
 - Tests
 
 ### Detailed work
@@ -108,12 +108,12 @@ Generate and install a system service unit. Three platforms in v1:
 
    ```
    [Unit]
-   Description=talos agent
+   Description=hebe agent
    After=network.target
 
    [Service]
    Type=simple
-   ExecStart=/usr/local/bin/talos run
+   ExecStart=/usr/local/bin/hebe run
    Environment="HOME=%h"
    Restart=on-failure
    RestartSec=5
@@ -122,13 +122,13 @@ Generate and install a system service unit. Three platforms in v1:
    WantedBy=default.target
    ```
 
-   Install with `systemctl --user daemon-reload && systemctl --user enable talos.service`.
+   Install with `systemctl --user daemon-reload && systemctl --user enable hebe.service`.
 
-3. macOS plist: `<plist><dict><key>Label</key>com.talos.agent</key><key>ProgramArguments</key>...</dict></plist>`. Install with `launchctl load`.
+3. macOS plist: `<plist><dict><key>Label</key>com.hebe.agent</key><key>ProgramArguments</key>...</dict></plist>`. Install with `launchctl load`.
 
-4. Windows: `sc.exe create talos binPath= "..\talos.exe" start= auto`. Document this is best-effort — if it doesn't work cleanly, defer Windows service to v1.1.
+4. Windows: `sc.exe create hebe binPath= "..\hebe.exe" start= auto`. Document this is best-effort — if it doesn't work cleanly, defer Windows service to v1.1.
 
-5. `talos service status` shows: `installed | running | stopped | not-installed` per platform.
+5. `hebe service status` shows: `installed | running | stopped | not-installed` per platform.
 
 ### Tests / verification
 
@@ -160,18 +160,18 @@ Generate and install a system service unit. Three platforms in v1:
 
 ### Goal
 
-`talos run` writes a PID file at `~/.talos/talos.pid`; SIGTERM/SIGINT triggers graceful shutdown per `v1-architecture.md` §19.
+`hebe run` writes a PID file at `~/.hebe/hebe.pid`; SIGTERM/SIGINT triggers graceful shutdown per `v1-architecture.md` §19.
 
 ### Files to create
 
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Run.kt` (edit — implement)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/daemon/PidFile.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/daemon/Shutdown.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Run.kt` (edit — implement)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/daemon/PidFile.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/daemon/Shutdown.kt` (new)
 - Tests
 
 ### Detailed work
 
-1. `PidFile.acquire(path)`: writes the current PID; uses an exclusive lock (`FileChannel.tryLock`) so a second `talos run` can't double-launch. On already-locked: print "talos already running (pid=X)" and exit 1.
+1. `PidFile.acquire(path)`: writes the current PID; uses an exclusive lock (`FileChannel.tryLock`) so a second `hebe run` can't double-launch. On already-locked: print "hebe already running (pid=X)" and exit 1.
 
 2. `Shutdown.installHook(scope, components)`:
    - Registers signal handlers for `SIGTERM`, `SIGINT`.
@@ -181,7 +181,7 @@ Generate and install a system service unit. Three platforms in v1:
 
 ### Tests / verification
 
-- `talos run` writes PID; second `run` fails.
+- `hebe run` writes PID; second `run` fails.
 - `kill -TERM <pid>` triggers graceful drain; in-flight tool call gets cancelled cleanly.
 
 ### Acceptance criteria
@@ -196,7 +196,7 @@ Generate and install a system service unit. Three platforms in v1:
 
 ---
 
-## M9.T4 — Onboarding wizard (`talos onboard`)
+## M9.T4 — Onboarding wizard (`hebe onboard`)
 
 **Status**: pending  
 **Size**: L  
@@ -205,13 +205,13 @@ Generate and install a system service unit. Three platforms in v1:
 
 ### Goal
 
-Interactive wizard that walks through LLM endpoint + Telegram setup + admin password, generates `~/.talos/config.toml` + populates `secrets.db`, deletes `BOOTSTRAP.md`. After completion, `talos doctor` reports green.
+Interactive wizard that walks through LLM endpoint + Telegram setup + admin password, generates `~/.hebe/config.toml` + populates `secrets.db`, deletes `BOOTSTRAP.md`. After completion, `hebe doctor` reports green.
 
 ### Files to create
 
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Onboard.kt` (edit — implement)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/onboard/Steps.kt` (new — pure functions)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/onboard/Prompts.kt` (new — TUI helpers via clikt)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Onboard.kt` (edit — implement)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/onboard/Steps.kt` (new — pure functions)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/onboard/Prompts.kt` (new — TUI helpers via clikt)
 - Tests with scripted input
 
 ### Detailed work
@@ -224,10 +224,10 @@ Interactive wizard that walks through LLM endpoint + Telegram setup + admin pass
    5. **Telegram (optional)**: ask `enable Telegram? [y/N]`. If yes:
       - Prompt for bot token; ping `getMe`; store under `telegram.bot_token`.
       - Ask the user to message the bot from their personal Telegram; auto-detect operator id from the next inbound message (5-minute window) or accept manual input.
-   6. **Generate config**: write `~/.talos/config.toml` from `TalosConfig.minimal(...)` populated with the answers.
+   6. **Generate config**: write `~/.hebe/config.toml` from `HebeConfig.minimal(...)` populated with the answers.
    7. **Seed workspace**: `WorkspaceSeeder.seedIfMissing(...)`.
    8. **Generate receipts signing key**: `SigningKey.bootstrap(...)`.
-   9. **Finalise**: delete `BOOTSTRAP.md`; print "All set. Run `talos doctor` to verify, then `talos run` to start."
+   9. **Finalise**: delete `BOOTSTRAP.md`; print "All set. Run `hebe doctor` to verify, then `hebe run` to start."
 
 2. The wizard is **idempotent**: rerunning skips already-completed steps unless `--force`.
 
@@ -260,11 +260,11 @@ Interactive wizard that walks through LLM endpoint + Telegram setup + admin pass
 
 ### Goal
 
-When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, talos exports spans for `dispatch.<tool>`, `memory.search`, `plugin.start`, `channel.reply` (and koog's spans). Otherwise no-op.
+When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, hebe exports spans for `dispatch.<tool>`, `memory.search`, `plugin.start`, `channel.reply` (and koog's spans). Otherwise no-op.
 
 ### Files to create
 
-- `modules/observability/src/main/kotlin/com/talos/observability/OtelBootstrap.kt` (new)
+- `modules/observability/src/main/kotlin/com/hebe/observability/OtelBootstrap.kt` (new)
 - Tests
 
 ### Detailed work
@@ -296,7 +296,7 @@ When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, talos exports spans for `dispatch.<to
 
 ---
 
-## M9.T6 — Fat-JAR via Gradle Shadow + `./talos` shell wrapper
+## M9.T6 — Fat-JAR via Gradle Shadow + `./hebe` shell wrapper
 
 **Status**: pending  
 **Size**: S  
@@ -305,12 +305,12 @@ When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, talos exports spans for `dispatch.<to
 
 ### Goal
 
-`./gradlew shadowJar` produces a single JAR; a shell wrapper `./talos` runs it.
+`./gradlew shadowJar` produces a single JAR; a shell wrapper `./hebe` runs it.
 
 ### Files to create / modify
 
 - `modules/cli-app/build.gradle.kts` (edit — finalise Shadow config)
-- `talos` (edit — production wrapper, replacing M0.T11's dev wrapper)
+- `hebe` (edit — production wrapper, replacing M0.T11's dev wrapper)
 - Tests via CI
 
 ### Detailed work
@@ -319,11 +319,11 @@ When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, talos exports spans for `dispatch.<to
 
    ```kotlin
    tasks.shadowJar {
-       archiveBaseName.set("talos")
+       archiveBaseName.set("hebe")
        archiveClassifier.set("")
        archiveVersion.set(project.version.toString())
        manifest {
-           attributes["Main-Class"] = "com.talos.cli.MainKt"
+           attributes["Main-Class"] = "com.hebe.cli.MainKt"
        }
        mergeServiceFiles()                  // important for ServiceLoader (e.g. Detekt / SLF4J)
        isZip64 = true                       // dependency count may exceed 65k entries
@@ -336,21 +336,21 @@ When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, talos exports spans for `dispatch.<to
    ```bash
    #!/usr/bin/env bash
    set -euo pipefail
-   JAR_DIR="${KOKLYP_HOME:-/usr/local/lib/talos}"
-   JAR="$JAR_DIR/talos.jar"
+   JAR_DIR="${KOKLYP_HOME:-/usr/local/lib/hebe}"
+   JAR="$JAR_DIR/hebe.jar"
    if [ ! -f "$JAR" ]; then
        # dev fallback: run from build output
-       JAR="$(dirname "$0")/modules/cli-app/build/libs/talos.jar"
+       JAR="$(dirname "$0")/modules/cli-app/build/libs/hebe.jar"
    fi
    exec java -jar "$JAR" "$@"
    ```
 
-3. Document install: `mkdir -p /usr/local/lib/talos && cp build/libs/talos.jar /usr/local/lib/talos/ && cp talos /usr/local/bin/`.
+3. Document install: `mkdir -p /usr/local/lib/hebe && cp build/libs/hebe.jar /usr/local/lib/hebe/ && cp hebe /usr/local/bin/`.
 
 ### Tests / verification
 
 - `./gradlew shadowJar` succeeds.
-- `java -jar build/libs/talos.jar --help` works.
+- `java -jar build/libs/hebe.jar --help` works.
 
 ### Acceptance criteria
 
@@ -369,7 +369,7 @@ When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, talos exports spans for `dispatch.<to
 
 ---
 
-## M9.T7 — `talos completion bash/zsh/fish`
+## M9.T7 — `hebe completion bash/zsh/fish`
 
 **Status**: pending  
 **Size**: S  
@@ -382,7 +382,7 @@ Shell completion for subcommands.
 
 ### Files to create / modify
 
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Completion.kt` (edit — implement)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Completion.kt` (edit — implement)
 - Tests
 
 ### Detailed work
@@ -390,9 +390,9 @@ Shell completion for subcommands.
 1. Use clikt's built-in `installCompletion()` support (Clikt 5 has this baked in). Wire as:
 
    ```
-   talos completion bash > ~/.local/share/bash-completion/completions/talos
-   talos completion zsh > ~/.zfunc/_talos
-   talos completion fish > ~/.config/fish/completions/talos.fish
+   hebe completion bash > ~/.local/share/bash-completion/completions/hebe
+   hebe completion zsh > ~/.zfunc/_hebe
+   hebe completion fish > ~/.config/fish/completions/hebe.fish
    ```
 
 2. The command writes the script to stdout; users redirect.
@@ -411,7 +411,7 @@ Shell completion for subcommands.
 
 ---
 
-## M9.T8 — `talos status [--recent]`
+## M9.T8 — `hebe status [--recent]`
 
 **Status**: pending  
 **Size**: S  
@@ -424,7 +424,7 @@ Print recent receipts + last LLM call + channel health in a compact table.
 
 ### Files to create / modify
 
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Status.kt` (edit — implement)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Status.kt` (edit — implement)
 - Tests
 
 ### Detailed work

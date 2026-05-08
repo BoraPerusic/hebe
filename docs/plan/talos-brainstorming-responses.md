@@ -1,4 +1,4 @@
-# Talos Brainstorming Responses
+# Hebe Brainstorming Responses
 
 ## 1. Pushbacks
 

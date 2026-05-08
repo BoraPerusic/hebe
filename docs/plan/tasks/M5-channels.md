@@ -22,9 +22,9 @@ The seam between channels and the agent. Merges N channel flows into one; provid
 ### Files to create
 
 - `modules/channels/api/build.gradle.kts` (edit)
-- `modules/channels/api/src/main/kotlin/com/talos/channels/ChannelManager.kt` (new)
-- `modules/channels/api/src/main/kotlin/com/talos/channels/InjectChannel.kt` (new)
-- `modules/channels/api/src/main/kotlin/com/talos/channels/ChannelRegistry.kt` (new)
+- `modules/channels/api/src/main/kotlin/com/hebe/channels/ChannelManager.kt` (new)
+- `modules/channels/api/src/main/kotlin/com/hebe/channels/InjectChannel.kt` (new)
+- `modules/channels/api/src/main/kotlin/com/hebe/channels/ChannelRegistry.kt` (new)
 - Tests
 
 ### Detailed work
@@ -32,7 +32,7 @@ The seam between channels and the agent. Merges N channel flows into one; provid
 1. `ChannelManager`:
 
    ```kotlin
-   class ChannelManager(private val agent: TalosAgent, private val observer: Observer) {
+   class ChannelManager(private val agent: HebeAgent, private val observer: Observer) {
        private val channels = mutableMapOf<String, Channel>()
        private val inject = InjectChannel(capacity = 64)
        fun register(channel: Channel) = …
@@ -86,8 +86,8 @@ A blocking REPL that implements `Channel`. Slash-commands (`/quit`, `/compact`, 
 ### Files to create
 
 - `modules/channels/cli/build.gradle.kts` (edit)
-- `modules/channels/cli/src/main/kotlin/com/talos/channels/cli/CliChannel.kt` (new)
-- `modules/channels/cli/src/main/kotlin/com/talos/channels/cli/Repl.kt` (new)
+- `modules/channels/cli/src/main/kotlin/com/hebe/channels/cli/CliChannel.kt` (new)
+- `modules/channels/cli/src/main/kotlin/com/hebe/channels/cli/Repl.kt` (new)
 - Tests with an in-memory `BufferedReader`
 
 ### Detailed work
@@ -109,7 +109,7 @@ A blocking REPL that implements `Channel`. Slash-commands (`/quit`, `/compact`, 
    - `shutdown()` exits the REPL.
 
 3. `Repl.run()`:
-   - Prompt: `talos> `.
+   - Prompt: `hebe> `.
    - Read line from jline's `LineReader`.
    - On line, push as `IncomingMessage(channel = "cli", userId = "operator", senderId = "tty", content, …)`.
    - On `Ctrl-C`, set a per-turn cancel flag. Double-tap within 2 s → break the REPL.
@@ -154,8 +154,8 @@ A Ktor server with HTTP Basic auth using a single password from `secrets.db`. Se
 ### Files to create
 
 - `modules/gateway/build.gradle.kts` (edit)
-- `modules/gateway/src/main/kotlin/com/talos/gateway/Gateway.kt` (new)
-- `modules/gateway/src/main/kotlin/com/talos/gateway/auth/BasicAuthPlugin.kt` (new)
+- `modules/gateway/src/main/kotlin/com/hebe/gateway/Gateway.kt` (new)
+- `modules/gateway/src/main/kotlin/com/hebe/gateway/auth/BasicAuthPlugin.kt` (new)
 - Tests
 
 ### Detailed work
@@ -176,7 +176,7 @@ A Ktor server with HTTP Basic auth using a single password from `secrets.db`. Se
        install(SSE)
        install(WebSockets)
        install(Authentication) {
-           basic("admin") { realm = "talos"; validate { … } }
+           basic("admin") { realm = "hebe"; validate { … } }
        }
        routing {
            authenticate("admin") {
@@ -226,8 +226,8 @@ A `Channel`-implementing `WebChannel` whose outbound replies stream over SSE. Ea
 ### Files to create
 
 - `modules/channels/web/build.gradle.kts` (edit)
-- `modules/channels/web/src/main/kotlin/com/talos/channels/web/WebChannel.kt` (new)
-- `modules/channels/web/src/main/kotlin/com/talos/channels/web/Routes.kt` (new — registers routes on `Application`)
+- `modules/channels/web/src/main/kotlin/com/hebe/channels/web/WebChannel.kt` (new)
+- `modules/channels/web/src/main/kotlin/com/hebe/channels/web/Routes.kt` (new — registers routes on `Application`)
 - Tests with Ktor's TestApplication
 
 ### Detailed work
@@ -278,7 +278,7 @@ Single-file HTML + light JS (HTMX preferred; Svelte if necessary). Sends + recei
 - `modules/gateway/src/main/resources/static/index.html` (new)
 - `modules/gateway/src/main/resources/static/app.js` (new)
 - `modules/gateway/src/main/resources/static/style.css` (new)
-- `modules/gateway/src/main/kotlin/com/talos/gateway/StaticRoutes.kt` (new — serves `/`)
+- `modules/gateway/src/main/kotlin/com/hebe/gateway/StaticRoutes.kt` (new — serves `/`)
 - Tests via headless browser are out of scope for v1; manual happy-path
 
 ### Detailed work
@@ -332,7 +332,7 @@ UI surface to search workspace + view docs read-only.
 
 ### Files to create
 
-- `modules/gateway/src/main/kotlin/com/talos/gateway/MemoryRoutes.kt` (new)
+- `modules/gateway/src/main/kotlin/com/hebe/gateway/MemoryRoutes.kt` (new)
 - `modules/gateway/src/main/resources/static/memory.js` (new)
 - Tests with Ktor's TestApplication
 
@@ -375,7 +375,7 @@ Tabular view of recent receipts + a "Verify" button that runs `Receipts.verify` 
 
 ### Files to create
 
-- `modules/gateway/src/main/kotlin/com/talos/gateway/ReceiptsRoutes.kt` (new)
+- `modules/gateway/src/main/kotlin/com/hebe/gateway/ReceiptsRoutes.kt` (new)
 - `modules/gateway/src/main/resources/static/receipts.js` (new)
 - Tests
 
@@ -420,9 +420,9 @@ Telegram bot via `org.telegram:telegrambots`. Bot token from secrets. Operator g
 ### Files to create
 
 - `modules/channels/telegram/build.gradle.kts` (edit)
-- `modules/channels/telegram/src/main/kotlin/com/talos/channels/telegram/TelegramChannel.kt` (new)
-- `modules/channels/telegram/src/main/kotlin/com/talos/channels/telegram/UpdatePoller.kt` (new — long-poll loop)
-- `modules/channels/telegram/src/main/kotlin/com/talos/channels/telegram/DraftThrottler.kt` (new)
+- `modules/channels/telegram/src/main/kotlin/com/hebe/channels/telegram/TelegramChannel.kt` (new)
+- `modules/channels/telegram/src/main/kotlin/com/hebe/channels/telegram/UpdatePoller.kt` (new — long-poll loop)
+- `modules/channels/telegram/src/main/kotlin/com/hebe/channels/telegram/DraftThrottler.kt` (new)
 - Tests with `MockTelegramApi`
 
 ### Detailed work
@@ -478,7 +478,7 @@ Receive updates via webhook instead of long-poll. Webhook URL registered with Te
 
 ### Files to create
 
-- `modules/channels/telegram/src/main/kotlin/com/talos/channels/telegram/TelegramWebhookRoute.kt` (new)
+- `modules/channels/telegram/src/main/kotlin/com/hebe/channels/telegram/TelegramWebhookRoute.kt` (new)
 - Edit `TelegramChannel` to support `mode: "polling" | "webhook"` from config.
 - Tests with Ktor's TestApplication
 
@@ -496,7 +496,7 @@ Receive updates via webhook instead of long-poll. Webhook URL registered with Te
 
    `secretPath` is a random 32-char string stored in `secrets.db` under `telegram.webhook_secret_path`. Telegram's `setWebhook(url=https://.../api/webhooks/telegram/<secretPath>)` ensures only Telegram can hit it (as long as the secret stays secret).
 
-2. `setWebhook` registration is part of `talos onboard` (M9.T4).
+2. `setWebhook` registration is part of `hebe onboard` (M9.T4).
 
 ### Tests / verification
 
@@ -515,7 +515,7 @@ Receive updates via webhook instead of long-poll. Webhook URL registered with Te
 
 ---
 
-## M5.T10 — Channel `healthCheck()` exposed in `/api/status` and `talos doctor`
+## M5.T10 — Channel `healthCheck()` exposed in `/api/status` and `hebe doctor`
 
 **Status**: pending  
 **Size**: S  
@@ -524,12 +524,12 @@ Receive updates via webhook instead of long-poll. Webhook URL registered with Te
 
 ### Goal
 
-Aggregate per-channel health into a single status surface used by both the web `/api/status` route and the `talos doctor` CLI subcommand.
+Aggregate per-channel health into a single status surface used by both the web `/api/status` route and the `hebe doctor` CLI subcommand.
 
 ### Files to create
 
-- `modules/gateway/src/main/kotlin/com/talos/gateway/StatusRoute.kt` (new)
-- `modules/cli-app/src/main/kotlin/com/talos/cli/commands/Doctor.kt` (edit; full impl in M9.T1, this task wires the channel section)
+- `modules/gateway/src/main/kotlin/com/hebe/gateway/StatusRoute.kt` (new)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Doctor.kt` (edit; full impl in M9.T1, this task wires the channel section)
 - Tests
 
 ### Detailed work
@@ -549,7 +549,7 @@ Aggregate per-channel health into a single status surface used by both the web `
    }
    ```
 
-2. `talos doctor` calls the same aggregator (the function lives in `gateway` or a small `status` module; both surfaces consume it).
+2. `hebe doctor` calls the same aggregator (the function lives in `gateway` or a small `status` module; both surfaces consume it).
 
 ### Tests / verification
 

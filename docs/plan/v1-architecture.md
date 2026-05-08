@@ -1,6 +1,6 @@
-# talos — v1 architecture (solution + contracts)
+# hebe — v1 architecture (solution + contracts)
 
-The concrete contracts that v1 implements. Where the higher-level [`talos-architecture.md`](talos-architecture.md) is the blueprint, this is the **wiring diagram** — interfaces, schemas, lifecycle, error taxonomies.
+The concrete contracts that v1 implements. Where the higher-level [`hebe-architecture.md`](hebe-architecture.md) is the blueprint, this is the **wiring diagram** — interfaces, schemas, lifecycle, error taxonomies.
 
 Written so a contributor can pick a slice and implement it without re-deciding the shape.
 
@@ -36,7 +36,7 @@ Written so a contributor can pick a slice and implement it without re-deciding t
 ## 1. Module layout (Gradle)
 
 ```
-talos/
+hebe/
 ├── settings.gradle.kts
 ├── build.gradle.kts                ← root: versions, conventions, Detekt + ktlint
 ├── gradle/libs.versions.toml       ← version catalog (already exists)
@@ -57,11 +57,11 @@ talos/
 │   ├── channels/cli/               ← CLI REPL
 │   ├── channels/web/               ← Ktor SSE/WebSocket + browser UI
 │   ├── channels/telegram/          ← Telegram channel
-│   ├── mcp-server/                 ← talos-as-MCP-server (stdio + Ktor SSE/WS)
+│   ├── mcp-server/                 ← hebe-as-MCP-server (stdio + Ktor SSE/WS)
 │   ├── gateway/                    ← Ktor backend wiring: console + webhook ingress
 │   ├── scheduler/                  ← cron, routines, heartbeat, scheduled maintenance
 │   ├── detekt-rules/               ← custom Detekt rules (mutation-funnel guard)
-│   └── cli-app/                    ← `talos` binary entry; argparse; subcommands
+│   └── cli-app/                    ← `hebe` binary entry; argparse; subcommands
 ├── plugin-template/                ← Gradle template repo for internal plugin authors
 └── docs/
 ```
@@ -118,7 +118,7 @@ Pinned in `gradle/libs.versions.toml`:
 ## 3. Kernel ABI (`api` module)
 
 ```kotlin
-// modules/api/src/main/kotlin/com/talos/api/
+// modules/api/src/main/kotlin/com/hebe/api/
 
 /* ── LlmProvider ───────────────────────────────────────────── */
 
@@ -170,7 +170,7 @@ sealed class StreamEvent {
 
 data class ParsedToolCall(
     val id: String,                     // provider-side call id
-    val name: String,                   // talos-side tool name
+    val name: String,                   // hebe-side tool name
     val args: JsonObject,
 )
 
@@ -349,9 +349,9 @@ sealed interface PendingReason {
 ## 4. Plugin ABI (`plugin-api` module)
 
 ```kotlin
-// modules/plugin-api/src/main/kotlin/com/talos/plugin/
+// modules/plugin-api/src/main/kotlin/com/hebe/plugin/
 
-abstract class TalosPlugin(wrapper: org.pf4j.PluginWrapper) : org.pf4j.Plugin(wrapper) {
+abstract class HebePlugin(wrapper: org.pf4j.PluginWrapper) : org.pf4j.Plugin(wrapper) {
     open fun tools(host: PluginHost): List<Tool> = emptyList()
     open fun channels(host: PluginHost): List<Channel> = emptyList()
     open fun memoryStores(host: PluginHost): List<MemoryStore> = emptyList()
@@ -396,7 +396,7 @@ data class HttpResponse(val status: Int, val headers: Map<String, List<String>>,
 class PluginCapabilityException(message: String) : RuntimeException(message)
 
 data class PluginManifest(
-    val talosApiVersion: String,
+    val hebeApiVersion: String,
     val capabilities: Set<Capability>,
     val permissions: Set<Permission>,
     val allowlistDomains: List<String>,
@@ -577,13 +577,13 @@ CREATE TABLE pending_approvals (
 ## 6. Workspace layout
 
 ```
-~/.talos/workspace/
+~/.hebe/workspace/
 ├── README.md                   ← static; explains the workspace to a new operator
-├── BOOTSTRAP.md                ← deleted by `talos onboard` after setup
+├── BOOTSTRAP.md                ← deleted by `hebe onboard` after setup
 ├── IDENTITY.md                 ← agent persona; loaded from Default scope every turn
 ├── MEMORY.md                   ← long-term facts/preferences; loaded for 1:1 contexts
 ├── HEARTBEAT.md                ← checklist read by the heartbeat routine
-├── USER.md                     ← (optional) what talos knows about the operator
+├── USER.md                     ← (optional) what hebe knows about the operator
 ├── AGENTS.md                   ← (optional) sub-agent registry; v1 has none
 ├── daily/
 │   └── 2026-05-04.md           ← daily logs created by the daily-digest routine
@@ -598,10 +598,10 @@ CREATE TABLE pending_approvals (
 ## 7. Config schema (`config.toml`)
 
 ```toml
-# ~/.talos/config.toml
+# ~/.hebe/config.toml
 
-[talos]
-data_dir = "~/.talos"
+[hebe]
+data_dir = "~/.hebe"
 log_level = "info"
 
 [llm]
@@ -637,12 +637,12 @@ port           = 8765
 admin_password_secret = "web.password"
 
 [channels.telegram]
-enabled         = false                    # flipped on by `talos onboard`
+enabled         = false                    # flipped on by `hebe onboard`
 bot_token_secret = "telegram.bot_token"
 operator_telegram_id = 123456789
 
 [plugins]
-registry        = "acr.example.com/talos-plugins"
+registry        = "acr.example.com/hebe-plugins"
 auto_pull       = []                       # list of "<name>:<version>" to pull on boot
 publisher_keys  = []                       # hex Ed25519 keys trusted for verification
 
@@ -665,12 +665,12 @@ servers = []                               # see schema below
 # dynamic_keywords = []
 ```
 
-Validation: tomlj load → typed projection (`TalosConfig`) via kotlinx-serialization or hand-rolled mapper. Bad config fails fast on boot with a precise diagnostic.
+Validation: tomlj load → typed projection (`HebeConfig`) via kotlinx-serialization or hand-rolled mapper. Bad config fails fast on boot with a precise diagnostic.
 
 ## 8. Secrets store
 
 ```
-~/.talos/secrets.db                         ← SQLite, AES-256-GCM at rest
+~/.hebe/secrets.db                         ← SQLite, AES-256-GCM at rest
 master key                                    ← OS keychain (Keychain / secret-service / Cred Mgr)
                                                 fallback: passphrase-derived (PBKDF2-HMAC-SHA256, 600k rounds), stored in chmod 600 file
 ```
@@ -759,25 +759,25 @@ suspend fun runAgenticLoop(
 ## 11. Plugin lifecycle (PF4J integration)
 
 ```
-            (PF4J state)               (talos action)
+            (PF4J state)               (hebe action)
 ─────────────────────────────────────────────────────────────────────
-  CREATED       ← PluginManager scans ~/.talos/plugins
+  CREATED       ← PluginManager scans ~/.hebe/plugins
                    for each: pf4j-side classloader created, classes loaded
   ↓
   RESOLVED      ← PF4J validates plugin.properties, dependency graph
-                   talos parses plugin.toml (capabilities/permissions/signature)
+                   hebe parses plugin.toml (capabilities/permissions/signature)
                    verify Ed25519 signature against publisher_key (per signature_mode)
-                   verify talos_api_version compatibility
+                   verify hebe_api_version compatibility
   ↓
   STARTED       ← plugin.start() runs (PF4J)
-                   talos builds PluginHost with capability gates
+                   hebe builds PluginHost with capability gates
                    plugin.init(host) called
                    plugin.tools(host) collected → registered with ToolRegistry
                                                   with id = "<plugin>:<tool>"
                    ObserverEvent.PluginLoaded
   ↓ (running)
   STOPPED       ← plugin.teardown() called
-                   talos removes the plugin's tools from ToolRegistry
+                   hebe removes the plugin's tools from ToolRegistry
                    plugin.stop() runs (PF4J)
   ↓
   UNLOADED      ← classloader closed
@@ -786,44 +786,44 @@ suspend fun runAgenticLoop(
 
 ABI compatibility:
 
-- `talos_api_version` is a SemVer range (`"0.1.x"` matches `0.1.*`).
+- `hebe_api_version` is a SemVer range (`"0.1.x"` matches `0.1.*`).
 - We never break `api` types within a major. Fields can be added; never removed within `0.x` until v1 ships and we cut `1.0`.
 
 ## 12. OCI/ACR distribution flow
 
 ```
-$ talos plugin install acr.example.com/talos-plugins/linear:0.3.1
+$ hebe plugin install acr.example.com/hebe-plugins/linear:0.3.1
 
   1. Resolve registry auth.
      - DefaultAzureCredential chain: env (AZURE_*) → managed identity → az login token
      - For non-ACR registries, fall back to docker config or ORAS auth file.
-  2. ORAS pull <ref> → tarball at ~/.talos/cache/oci/<sha256>/.
+  2. ORAS pull <ref> → tarball at ~/.hebe/cache/oci/<sha256>/.
   3. Verify Ed25519 signature.
      - signature in `plugin.toml`; publisher_key matched against config.plugins.publisher_keys.
      - signature_mode = required → reject unsigned or untrusted publishers.
      - signature_mode = optional → log warning, continue.
-  4. Verify talos_api_version compatibility.
-  5. Extract to ~/.talos/plugins/<name>-<version>/.
+  4. Verify hebe_api_version compatibility.
+  5. Extract to ~/.hebe/plugins/<name>-<version>/.
   6. Trigger PluginManager.loadPlugin(path) → starts PF4J lifecycle (§11).
   7. Persist install record into settings: plugins.installed = ["<name>:<version>", ...]
 
-$ talos plugin list
+$ hebe plugin list
   → reads installed records + PF4J state
 
-$ talos plugin remove <name>
-  → stops via PluginManager, deletes ~/.talos/plugins/<name>-<version>/
+$ hebe plugin remove <name>
+  → stops via PluginManager, deletes ~/.hebe/plugins/<name>-<version>/
   → removes install record
 ```
 
 OCI artifact shape:
 
-- Manifest media type: `application/vnd.talos.plugin.v1+json`.
-- Layer 0: `application/vnd.talos.plugin.archive.v1.tar+gzip` (the tar containing plugin.toml + plugin.properties + classes/ + lib/).
-- Optional layer: `application/vnd.talos.plugin.signature.v1+ed25519` (binary Ed25519 over the archive layer SHA-256).
+- Manifest media type: `application/vnd.hebe.plugin.v1+json`.
+- Layer 0: `application/vnd.hebe.plugin.archive.v1.tar+gzip` (the tar containing plugin.toml + plugin.properties + classes/ + lib/).
+- Optional layer: `application/vnd.hebe.plugin.signature.v1+ed25519` (binary Ed25519 over the archive layer SHA-256).
 
 ## 13. Receipts log format
 
-Append-only file at `~/.talos/receipts/YYYY-MM.log`. One JSON document per line (NDJSON). Hash-chained.
+Append-only file at `~/.hebe/receipts/YYYY-MM.log`. One JSON document per line (NDJSON). Hash-chained.
 
 ```
 {
@@ -847,7 +847,7 @@ Append-only file at `~/.talos/receipts/YYYY-MM.log`. One JSON document per line 
 - `self_hash` = SHA-256 over the canonical-form record minus `self_hash` and `sig`.
 - `sig` = Ed25519 over `self_hash` using the agent's signing key (generated on first boot, stored in `secrets.db` under `receipts.signing_key`).
 
-Verification is `talos memory show receipts/2026-05.log --verify`: walks the file, checks chain + signatures.
+Verification is `hebe memory show receipts/2026-05.log --verify`: walks the file, checks chain + signatures.
 
 ## 14. Web console API (REST + SSE)
 
@@ -896,8 +896,8 @@ data: {"message": "...", "retriable": true}
 
 **Server** (`mcp-server` module):
 
-- stdio: `talos mcp serve` reads JSON-RPC framed messages from stdin, writes to stdout.
-- HTTP/SSE: when `mcp.server.http_bind` is set, talos's gateway exposes `/mcp/sse` (SSE transport from MCP Kotlin SDK) and `/mcp/ws` (WebSocket transport).
+- stdio: `hebe mcp serve` reads JSON-RPC framed messages from stdin, writes to stdout.
+- HTTP/SSE: when `mcp.server.http_bind` is set, hebe's gateway exposes `/mcp/sse` (SSE transport from MCP Kotlin SDK) and `/mcp/ws` (WebSocket transport).
 - Tools advertised: every entry in `ToolRegistry` whose `risk = Low | Medium`. `High` + `requiresApproval` tools are gated behind a feature flag (`mcp.server.expose_high_risk = false` default).
 
 **Client** (`tools/mcp-client` module):
@@ -926,16 +926,16 @@ data: {"message": "...", "retriable": true}
 A blocking REPL backed by the same `Channel` interface.
 
 ```
-$ talos run
-talos> hi
+$ hebe run
+hebe> hi
 agent> Hi, Bora.
-talos> read README.md and summarise it
+hebe> read README.md and summarise it
 agent> [streams reply, possibly with [tool: file_system_read] inline annotation]
-talos> /compact
+hebe> /compact
 [compaction summary]
-talos> /approve 8a4f
+hebe> /approve 8a4f
 agent> Approved. Continuing.
-talos> /quit
+hebe> /quit
 $
 ```
 
@@ -958,24 +958,24 @@ Single-threaded job loop reading from `jobs(status='pending', trigger_at <= now)
 
 ```
 1.  parse CLI args (subcommand + options)
-2.  load ~/.talos/config.toml; validate; resolve env-refs
+2.  load ~/.hebe/config.toml; validate; resolve env-refs
 3.  open OS keychain → get master key (with passphrase fallback)
 4.  open secrets.db
-5.  open talos.db
+5.  open hebe.db
     - run Flyway migrations (V1, V2, …) in order; abort on failure
 6.  build Observer (logback + OTel exporter)
 7.  build LlmProvider (OpenAiCompatProvider with secrets-resolved api_key)
 8.  build MemoryStore (SqliteMemoryStore + WorkspaceFs)
     - run startup hygiene: scan workspace docs, ensure FTS index in sync
-9.  build SkillRegistry: bundled-skills/* + ~/.talos/skills/*
+9.  build SkillRegistry: bundled-skills/* + ~/.hebe/skills/*
 10. build PluginManager (PF4J)
-    - load plugins from ~/.talos/plugins/
+    - load plugins from ~/.hebe/plugins/
     - on auto_pull entries, ORAS pull missing ones
     - failures here are non-fatal: log + continue, expose via doctor
 11. build ToolRegistry = builtin tools + plugin tools + mcp-client tools
 12. build SecurityPolicy (autonomy, workspace, command, leak detector, prompt guard)
 13. build ToolDispatcher (registry + security + receipts + memory)
-14. build TalosAgent (wraps koog with the above)
+14. build HebeAgent (wraps koog with the above)
 15. build ChannelManager
     - register CLI / Web / Telegram (whichever are enabled in config)
     - set up injectChannel
@@ -986,7 +986,7 @@ Single-threaded job loop reading from `jobs(status='pending', trigger_at <= now)
     - mount /api/* console routes
     - bind to web.bind:web.port
 19. signal-handler register (SIGTERM, SIGINT → graceful shutdown)
-20. log "talos ready"; start blocking on Ctrl-C / `/quit`
+20. log "hebe ready"; start blocking on Ctrl-C / `/quit`
 ```
 
 Graceful shutdown reverses the order: stop accepting new messages → drain in-flight turns (best-effort, with deadline) → mark pending approvals as expired → close gateway → close scheduler → close channels → close MCP server → flush observer → close memory + secrets DBs.
@@ -995,16 +995,16 @@ Graceful shutdown reverses the order: stop accepting new messages → drain in-f
 
 ```kotlin
 // modules/api
-sealed class TalosException(message: String, cause: Throwable? = null) : Exception(message, cause) {
-    class Config(message: String) : TalosException(message)
-    class Provider(val retriable: Boolean, message: String, cause: Throwable? = null) : TalosException(message, cause)
-    class Tool(val tool: String, val retriable: Boolean, message: String) : TalosException(message)
-    class Plugin(val pluginId: String, message: String, cause: Throwable? = null) : TalosException(message, cause)
-    class Security(message: String) : TalosException(message)
-    class PolicyDenied(message: String) : TalosException(message)
-    class Approval(message: String) : TalosException(message)
-    class Memory(message: String) : TalosException(message)
-    class Channel(val channel: String, message: String, cause: Throwable? = null) : TalosException(message, cause)
+sealed class HebeException(message: String, cause: Throwable? = null) : Exception(message, cause) {
+    class Config(message: String) : HebeException(message)
+    class Provider(val retriable: Boolean, message: String, cause: Throwable? = null) : HebeException(message, cause)
+    class Tool(val tool: String, val retriable: Boolean, message: String) : HebeException(message)
+    class Plugin(val pluginId: String, message: String, cause: Throwable? = null) : HebeException(message, cause)
+    class Security(message: String) : HebeException(message)
+    class PolicyDenied(message: String) : HebeException(message)
+    class Approval(message: String) : HebeException(message)
+    class Memory(message: String) : HebeException(message)
+    class Channel(val channel: String, message: String, cause: Throwable? = null) : HebeException(message, cause)
 }
 ```
 
@@ -1021,8 +1021,8 @@ Rules:
 
 - Log format: JSON via logback `JsonEncoder`. Required fields: `ts`, `level`, `logger`, `msg`, `session_id?`, `turn_id?`, `tool?`, `plugin?`, `channel?`, `trace_id?`, `span_id?`.
 - Sensitive params are redacted before reaching the log. The redaction list is in `security` module: `api_key`, `apikey`, `token`, `secret`, `password`, `auth`, `bearer`, `signature`, `cookie`, `email`, `phone` (configurable).
-- OTel: koog's exporter is used for spans inside the agent loop; we add talos-specific spans for `dispatch.<tool>`, `memory.search`, `plugin.start`, `channel.reply`. Defaults: OTLP to `http://localhost:4318` if `OTEL_EXPORTER_OTLP_ENDPOINT` is set, otherwise no-op exporter.
-- `talos doctor --verbose` prints OTel + log path + last 50 events from the in-memory ring buffer.
+- OTel: koog's exporter is used for spans inside the agent loop; we add hebe-specific spans for `dispatch.<tool>`, `memory.search`, `plugin.start`, `channel.reply`. Defaults: OTLP to `http://localhost:4318` if `OTEL_EXPORTER_OTLP_ENDPOINT` is set, otherwise no-op exporter.
+- `hebe doctor --verbose` prints OTel + log path + last 50 events from the in-memory ring buffer.
 
 ## 22. Security checks (concrete sequencing)
 

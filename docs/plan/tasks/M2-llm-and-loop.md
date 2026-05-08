@@ -22,10 +22,10 @@ A concrete `LlmProvider` backed by an OpenAI-compatible HTTP endpoint. Streams `
 ### Files to create
 
 - `modules/providers/openai-compat/build.gradle.kts` (edit)
-- `modules/providers/openai-compat/src/main/kotlin/com/talos/providers/openai/OpenAiCompatProvider.kt` (new)
-- `modules/providers/openai-compat/src/main/kotlin/com/talos/providers/openai/Wire.kt` (new — request/response DTOs)
-- `modules/providers/openai-compat/src/main/kotlin/com/talos/providers/openai/SseParser.kt` (new — server-sent-events stream parser)
-- `modules/providers/openai-compat/src/main/kotlin/com/talos/providers/openai/HttpClientFactory.kt` (new)
+- `modules/providers/openai-compat/src/main/kotlin/com/hebe/providers/openai/OpenAiCompatProvider.kt` (new)
+- `modules/providers/openai-compat/src/main/kotlin/com/hebe/providers/openai/Wire.kt` (new — request/response DTOs)
+- `modules/providers/openai-compat/src/main/kotlin/com/hebe/providers/openai/SseParser.kt` (new — server-sent-events stream parser)
+- `modules/providers/openai-compat/src/main/kotlin/com/hebe/providers/openai/HttpClientFactory.kt` (new)
 - Tests with recorded fixtures (uses cross-cutting X.T1)
 
 ### Detailed work
@@ -96,7 +96,7 @@ A concrete `LlmProvider` backed by an OpenAI-compatible HTTP endpoint. Streams `
 
 6. **Auth**: `Authorization: Bearer ${apiKey}` header on every request. The `apiKey` is resolved from `SecretStore` at construction; do not log it.
 
-7. **System messages**: talos's `ChatRequest.systemPrompt` becomes a `WireMessage(role="system", content=...)` prepended to `messages`.
+7. **System messages**: hebe's `ChatRequest.systemPrompt` becomes a `WireMessage(role="system", content=...)` prepended to `messages`.
 
 ### Tests / verification
 
@@ -137,7 +137,7 @@ A test-only `LlmProvider` that replays a recorded (or programmatically-built) se
 
 ### Files to create
 
-- `modules/providers/openai-compat/src/main/kotlin/com/talos/providers/openai/MockLlmProvider.kt` (new — or place in a `:modules:test-fixtures` module)
+- `modules/providers/openai-compat/src/main/kotlin/com/hebe/providers/openai/MockLlmProvider.kt` (new — or place in a `:modules:test-fixtures` module)
 - Builders: `MockLlmProvider.builder().textDelta("Hello").toolCall(...).done().build()`
 - Tests of the mock itself
 
@@ -199,7 +199,7 @@ A second `LlmProvider` impl that delegates to koog. The **only** file in the rep
 ### Files to create
 
 - `modules/core/build.gradle.kts` (edit)
-- `modules/core/src/main/kotlin/com/talos/core/llm/KoogLlmProvider.kt` (new)
+- `modules/core/src/main/kotlin/com/hebe/core/llm/KoogLlmProvider.kt` (new)
 - Tests using koog's mock fixtures or the `MockLlmProvider` of M2.T2
 
 ### Detailed work
@@ -257,8 +257,8 @@ Parse an `IncomingMessage`'s content into a `Submission` sealed type before the 
 
 ### Files to create
 
-- `modules/core/src/main/kotlin/com/talos/core/submission/SubmissionParser.kt` (new)
-- `modules/core/src/main/kotlin/com/talos/core/submission/SlashCommandParser.kt` (new)
+- `modules/core/src/main/kotlin/com/hebe/core/submission/SubmissionParser.kt` (new)
+- `modules/core/src/main/kotlin/com/hebe/core/submission/SlashCommandParser.kt` (new)
 - Tests with property + golden cases
 
 ### Detailed work
@@ -312,8 +312,8 @@ Manage `pending_approvals` rows + an in-memory wait map so the dispatcher can su
 ### Files to create
 
 - `modules/security/build.gradle.kts` (edit)
-- `modules/security/src/main/kotlin/com/talos/security/approval/ApprovalGate.kt` (new)
-- `modules/security/src/main/kotlin/com/talos/security/approval/PendingApprovalsRepo.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/approval/ApprovalGate.kt` (new)
+- `modules/security/src/main/kotlin/com/hebe/security/approval/PendingApprovalsRepo.kt` (new)
 - Tests
 
 ### Detailed work
@@ -335,13 +335,13 @@ Manage `pending_approvals` rows + an in-memory wait map so the dispatcher can su
    - If `RequireApproval(prompt)` → insert a row, send the prompt via `ctx.requestor.reply` with an `ApprovalRequest`, then `suspend` until either:
      - The corresponding `Submission.Approval` arrives → `Allow` or `Deny` according to the response.
      - The approval expires (default TTL 24 h) → `Deny`.
-     - `talos estop` → `Deny`.
+     - `hebe estop` → `Deny`.
 
 4. Suspension uses a `Channel<ApprovalDecision>` per pending id, stored in a `ConcurrentHashMap`. The dispatcher calls `gate.await(approvalId)` which suspends on that channel.
 
-5. **Resumption** of an in-flight approval after talos restarts: on boot, scan `pending_approvals WHERE resolved_at IS NULL` and:
+5. **Resumption** of an in-flight approval after hebe restarts: on boot, scan `pending_approvals WHERE resolved_at IS NULL` and:
    - If `expires_at < now`, mark expired.
-   - Otherwise, expose them via `talos status` so the operator sees there's a stuck turn. The original turn is gone (process restart); resolution after restart marks the row resolved but doesn't resume the turn.
+   - Otherwise, expose them via `hebe status` so the operator sees there's a stuck turn. The original turn is gone (process restart); resolution after restart marks the row resolved but doesn't resume the turn.
 
 ### Tests / verification
 
@@ -380,10 +380,10 @@ The single mutation funnel. Implements the state machine in `v1-architecture.md`
 ### Files to create
 
 - `modules/tools/dispatch/build.gradle.kts` (edit)
-- `modules/tools/dispatch/src/main/kotlin/com/talos/tools/dispatch/ToolDispatcher.kt` (new)
-- `modules/tools/dispatch/src/main/kotlin/com/talos/tools/dispatch/ToolRegistry.kt` (new)
-- `modules/tools/dispatch/src/main/kotlin/com/talos/tools/dispatch/DispatchOutcome.kt` (new — sealed)
-- `modules/tools/dispatch/src/main/kotlin/com/talos/tools/dispatch/Validator.kt` (new — pluggable interface)
+- `modules/tools/dispatch/src/main/kotlin/com/hebe/tools/dispatch/ToolDispatcher.kt` (new)
+- `modules/tools/dispatch/src/main/kotlin/com/hebe/tools/dispatch/ToolRegistry.kt` (new)
+- `modules/tools/dispatch/src/main/kotlin/com/hebe/tools/dispatch/DispatchOutcome.kt` (new — sealed)
+- `modules/tools/dispatch/src/main/kotlin/com/hebe/tools/dispatch/Validator.kt` (new — pluggable interface)
 - Tests
 
 ### Detailed work
@@ -511,7 +511,7 @@ Flag and ultimately break runaway tool-call loops. 3 warns / 5 force-text on dup
 
 ### Files to create
 
-- `modules/tools/dispatch/src/main/kotlin/com/talos/tools/dispatch/LoopDetector.kt` (new)
+- `modules/tools/dispatch/src/main/kotlin/com/hebe/tools/dispatch/LoopDetector.kt` (new)
 - Tests
 
 ### Detailed work
@@ -559,13 +559,13 @@ Reads `llm_calls` to enforce per-turn token cap + daily $-budget. Blocks new tur
 
 ### Files to create
 
-- `modules/tools/dispatch/src/main/kotlin/com/talos/tools/dispatch/CostGuard.kt` (new — actually lives wherever feels right; suggested in `core` since it's loop-scoped)
-- Move to `modules/core/src/main/kotlin/com/talos/core/cost/CostGuard.kt`
+- `modules/tools/dispatch/src/main/kotlin/com/hebe/tools/dispatch/CostGuard.kt` (new — actually lives wherever feels right; suggested in `core` since it's loop-scoped)
+- Move to `modules/core/src/main/kotlin/com/hebe/core/cost/CostGuard.kt`
 - Tests
 
 ### Detailed work
 
-1. Config (from `TalosConfig`): `dailyUsdCap`, `perTurnTokenCap`. Defaults: $5/day, 100k tokens/turn.
+1. Config (from `HebeConfig`): `dailyUsdCap`, `perTurnTokenCap`. Defaults: $5/day, 100k tokens/turn.
 
 2. `CostGuard.checkAllowed(turnId): CheckResult` queries `llm_calls` for today's spend (cost_micros_usd / 1_000_000) and current turn's tokens. Returns `Allow | DenyDaily(spentUsd) | DenyPerTurn(tokens)`.
 
@@ -607,18 +607,18 @@ Three-step ladder when context approaches the limit: workspace-promote → summa
 
 ### Files to create
 
-- `modules/core/src/main/kotlin/com/talos/core/compaction/Compactor.kt` (new)
-- `modules/core/src/main/kotlin/com/talos/core/compaction/CompactionStrategy.kt` (new)
+- `modules/core/src/main/kotlin/com/hebe/core/compaction/Compactor.kt` (new)
+- `modules/core/src/main/kotlin/com/hebe/core/compaction/CompactionStrategy.kt` (new)
 - Tests
 
 ### Detailed work
 
 1. `Compactor.maybeCompact(history: List<ChatMessage>, ctx: CompactionCtx): CompactedHistory`:
    - If `tokenCount(history) < threshold * maxContext`, return as-is.
-   - Else step 1: **workspace-promote**. Identify large content blobs (e.g. tool results > 4 KB) and move them to `~/.talos/workspace/context/<turn>-<seq>.md`, replacing them in history with a 1-line reference (`see workspace/context/2026-05-04-1.md`).
+   - Else step 1: **workspace-promote**. Identify large content blobs (e.g. tool results > 4 KB) and move them to `~/.hebe/workspace/context/<turn>-<seq>.md`, replacing them in history with a 1-line reference (`see workspace/context/2026-05-04-1.md`).
    - Re-check token count.
    - Step 2: **summarise**. Call the LLM with a summarisation prompt over the oldest N messages (those past a "keep window" of ~10 turns), replace them with the summary.
-   - Step 3: **refuse-to-truncate**. If summarisation fails (e.g. summarisation call errors), do NOT silently drop messages; throw `TalosException.Memory("compaction failed; refusing to truncate")` so the loop returns `Failure` and the operator can intervene.
+   - Step 3: **refuse-to-truncate**. If summarisation fails (e.g. summarisation call errors), do NOT silently drop messages; throw `HebeException.Memory("compaction failed; refusing to truncate")` so the loop returns `Failure` and the operator can intervene.
 
 2. `tokenCount` uses a heuristic: word count × 1.3 (rough English-text token ratio). Better estimators land in v2.
 
@@ -655,7 +655,7 @@ Trim history *before* it overflows. Compactor runs at the start of each turn, no
 
 ### Files to create
 
-- `modules/core/src/main/kotlin/com/talos/core/compaction/PreemptivePruner.kt` (new)
+- `modules/core/src/main/kotlin/com/hebe/core/compaction/PreemptivePruner.kt` (new)
 - Tests
 
 ### Detailed work
@@ -692,8 +692,8 @@ The v1 `LoopDelegate` for foreground chat turns. Holds the session lock, drives 
 
 ### Files to create
 
-- `modules/core/src/main/kotlin/com/talos/core/delegate/ChatDelegate.kt` (new)
-- `modules/core/src/main/kotlin/com/talos/core/loop/LoopDriver.kt` (new — `runAgenticLoop`)
+- `modules/core/src/main/kotlin/com/hebe/core/delegate/ChatDelegate.kt` (new)
+- `modules/core/src/main/kotlin/com/hebe/core/loop/LoopDriver.kt` (new — `runAgenticLoop`)
 - Tests against `MockLlmProvider`
 
 ### Detailed work
@@ -758,7 +758,7 @@ A sibling `LoopDelegate` for the scheduler. Same loop, **no draft updates**, seq
 
 ### Files to create
 
-- `modules/core/src/main/kotlin/com/talos/core/delegate/JobDelegate.kt` (new)
+- `modules/core/src/main/kotlin/com/hebe/core/delegate/JobDelegate.kt` (new)
 - Tests
 
 ### Detailed work
@@ -788,7 +788,7 @@ A sibling `LoopDelegate` for the scheduler. Same loop, **no draft updates**, seq
 
 ---
 
-## M2.T13 — `TalosAgent` facade
+## M2.T13 — `HebeAgent` facade
 
 **Status**: pending  
 **Size**: M  
@@ -801,8 +801,8 @@ The single entry point used by channels: `agent.handleMessage(IncomingMessage): 
 
 ### Files to create
 
-- `modules/core/src/main/kotlin/com/talos/core/agent/TalosAgent.kt` (new)
-- `modules/core/src/main/kotlin/com/talos/core/agent/SessionManager.kt` (new)
+- `modules/core/src/main/kotlin/com/hebe/core/agent/HebeAgent.kt` (new)
+- `modules/core/src/main/kotlin/com/hebe/core/agent/SessionManager.kt` (new)
 - Tests
 
 ### Detailed work
@@ -812,7 +812,7 @@ The single entry point used by channels: `agent.handleMessage(IncomingMessage): 
    - Resolves an `IncomingMessage` to a `Session` row (creating if missing).
    - Closes idle sessions after a configurable idle timeout (cleanup is best-effort; cron job handles real cleanup).
 
-2. `TalosAgent.handleMessage(msg)`:
+2. `HebeAgent.handleMessage(msg)`:
    1. Apply `BeforeInbound` hooks.
    2. `submissionParser.parse(msg)` → `Submission`.
    3. Branch on `Submission`:
@@ -859,8 +859,8 @@ Fail-open lifecycle hook framework. Hooks can mutate or suppress messages; excep
 
 ### Files to create
 
-- `modules/core/src/main/kotlin/com/talos/core/hooks/Hook.kt` (new — interface)
-- `modules/core/src/main/kotlin/com/talos/core/hooks/HookRunner.kt` (new)
+- `modules/core/src/main/kotlin/com/hebe/core/hooks/Hook.kt` (new — interface)
+- `modules/core/src/main/kotlin/com/hebe/core/hooks/HookRunner.kt` (new)
 - Tests
 
 ### Detailed work
@@ -877,7 +877,7 @@ Fail-open lifecycle hook framework. Hooks can mutate or suppress messages; excep
 
 2. `HookRunner` holds lists of each. `run` invokes them in registration order; a `null` return short-circuits (suppression). Exceptions are caught, logged, and treated as "no-op".
 
-3. Wire into `TalosAgent` and `ToolDispatcher`.
+3. Wire into `HebeAgent` and `ToolDispatcher`.
 
 ### Tests / verification
 
@@ -910,7 +910,7 @@ When the agent (or a tool) requests a credential via `ask_user`, subsequent mess
 
 ### Files to create
 
-- `modules/core/src/main/kotlin/com/talos/core/auth/AuthMode.kt` (new)
+- `modules/core/src/main/kotlin/com/hebe/core/auth/AuthMode.kt` (new)
 - Tests
 
 ### Detailed work
@@ -919,7 +919,7 @@ When the agent (or a tool) requests a credential via `ask_user`, subsequent mess
 
 2. When a tool calls `ask_user(purpose="credential", secretName="github_pat")`, the dispatcher returns `Pending`, and the agent enters auth-mode for this conversation.
 
-3. The next inbound message from the operator on this conversation is parsed by `SubmissionParser` as `AuthMode(msg, purpose, secret)`. `TalosAgent` handles it:
+3. The next inbound message from the operator on this conversation is parsed by `SubmissionParser` as `AuthMode(msg, purpose, secret)`. `HebeAgent` handles it:
    - `secretStore.put(secretName, secret)`.
    - Resume the suspended turn (similar to ApprovalGate resume).
    - **The raw secret never enters the `messages` table** — only a redacted "[credential entered]" placeholder.

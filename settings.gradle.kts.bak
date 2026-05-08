@@ -12,7 +12,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "talos"
+rootProject.name = "hebe"
 
 include(
     ":modules:api",

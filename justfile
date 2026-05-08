@@ -1,4 +1,4 @@
-# justfile for talos
+# justfile for hebe
 
 set shell := ["bash", "-c"]
 

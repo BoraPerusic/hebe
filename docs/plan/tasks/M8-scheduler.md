@@ -22,8 +22,8 @@ Parse standard 5-field cron expressions plus shortcuts (`@hourly`, `@daily`, `@e
 ### Files to create
 
 - `modules/scheduler/build.gradle.kts` (edit)
-- `modules/scheduler/src/main/kotlin/com/talos/scheduler/cron/Cron.kt` (new)
-- `modules/scheduler/src/main/kotlin/com/talos/scheduler/cron/CronParser.kt` (new)
+- `modules/scheduler/src/main/kotlin/com/hebe/scheduler/cron/Cron.kt` (new)
+- `modules/scheduler/src/main/kotlin/com/hebe/scheduler/cron/CronParser.kt` (new)
 - Tests with property + golden cases
 
 ### Detailed work
@@ -81,9 +81,9 @@ A single coroutine reads `jobs WHERE status = 'pending' AND trigger_at <= now()`
 
 ### Files to create
 
-- `modules/scheduler/src/main/kotlin/com/talos/scheduler/JobLoop.kt` (new)
-- `modules/scheduler/src/main/kotlin/com/talos/scheduler/JobRepo.kt` (new — `jobs` CRUD)
-- `modules/scheduler/src/main/kotlin/com/talos/scheduler/JobRunner.kt` (new — kind dispatch)
+- `modules/scheduler/src/main/kotlin/com/hebe/scheduler/JobLoop.kt` (new)
+- `modules/scheduler/src/main/kotlin/com/hebe/scheduler/JobRepo.kt` (new — `jobs` CRUD)
+- `modules/scheduler/src/main/kotlin/com/hebe/scheduler/JobRunner.kt` (new — kind dispatch)
 - Tests
 
 ### Detailed work
@@ -140,7 +140,7 @@ Watches `routines WHERE enabled=1`; for each, computes `next_run_at` from the cr
 
 ### Files to create
 
-- `modules/scheduler/src/main/kotlin/com/talos/scheduler/RoutinesEngine.kt` (new)
+- `modules/scheduler/src/main/kotlin/com/hebe/scheduler/RoutinesEngine.kt` (new)
 - Tests
 
 ### Detailed work
@@ -152,7 +152,7 @@ Watches `routines WHERE enabled=1`; for each, computes `next_run_at` from the cr
        - Insert a `jobs(kind='routine', payload_json={routine_id: <id>}, trigger_at=now, status='pending')`.
        - Update `last_run_at = now`, `next_run_at = cron.nextFire(now)`.
 
-2. Catchup: missed runs while talos was down.
+2. Catchup: missed runs while hebe was down.
    - Per `v1-tasks.md` X.T8 cut line, **catchup is v2** in the original plan, but lightweight catchup is cheap here: if `last_run_at + cron interval < now`, schedule one catchup invocation (`payload_json.catchup = true`) but don't insert N missed runs. Document the behaviour.
 
 3. The engine itself runs as a job loop tick at 30 s cadence (separate from the job loop's 5 s). Or piggy-back on the same loop — pick one and document.
@@ -189,7 +189,7 @@ Rolling-window transcript summarisation appended to `MEMORY.md` when the window 
 
 ### Files to create
 
-- `modules/scheduler/src/main/kotlin/com/talos/scheduler/maintenance/Summariser.kt` (new)
+- `modules/scheduler/src/main/kotlin/com/hebe/scheduler/maintenance/Summariser.kt` (new)
 - Tests
 
 ### Detailed work
@@ -230,7 +230,7 @@ Run an LLM pass over recent assistant outputs looking for "remember X" / "the us
 
 ### Files to create
 
-- `modules/scheduler/src/main/kotlin/com/talos/scheduler/maintenance/FactExtractor.kt` (new)
+- `modules/scheduler/src/main/kotlin/com/hebe/scheduler/maintenance/FactExtractor.kt` (new)
 - Tests
 
 ### Detailed work
@@ -274,7 +274,7 @@ End-of-day routine: generates `daily/YYYY-MM-DD.md` summarising the day's transc
 
 ### Files to create
 
-- `modules/scheduler/src/main/kotlin/com/talos/scheduler/maintenance/DailyDigest.kt` (new)
+- `modules/scheduler/src/main/kotlin/com/hebe/scheduler/maintenance/DailyDigest.kt` (new)
 - Tests
 
 ### Detailed work
@@ -320,7 +320,7 @@ Find chunks with NULL embeddings and batch-index them. Useful when the embedding
 
 ### Files to create
 
-- `modules/scheduler/src/main/kotlin/com/talos/scheduler/maintenance/EmbeddingRefresh.kt` (new)
+- `modules/scheduler/src/main/kotlin/com/hebe/scheduler/maintenance/EmbeddingRefresh.kt` (new)
 - Tests
 
 ### Detailed work
@@ -363,7 +363,7 @@ Detect jobs stuck in `running` past their deadline; mark `stuck`; retry once if 
 
 ### Files to create
 
-- `modules/scheduler/src/main/kotlin/com/talos/scheduler/maintenance/StuckJobDetector.kt` (new)
+- `modules/scheduler/src/main/kotlin/com/hebe/scheduler/maintenance/StuckJobDetector.kt` (new)
 - Tests
 
 ### Detailed work
@@ -403,7 +403,7 @@ Periodic agentic turn driven by `HEARTBEAT.md`. On non-OK output, deliver to the
 
 ### Files to create
 
-- `modules/scheduler/src/main/kotlin/com/talos/scheduler/maintenance/Heartbeat.kt` (new)
+- `modules/scheduler/src/main/kotlin/com/hebe/scheduler/maintenance/Heartbeat.kt` (new)
 - Tests
 
 ### Detailed work
@@ -412,7 +412,7 @@ Periodic agentic turn driven by `HEARTBEAT.md`. On non-OK output, deliver to the
 
 2. On fire:
    - Read `HEARTBEAT.md` content.
-   - Run a turn through `JobDelegate` with system prompt: "You are talos's heartbeat. Read HEARTBEAT.md (provided below). For each item, perform the check. If everything is OK, reply with literally `OK`. Otherwise reply with a short summary of what needs attention."
+   - Run a turn through `JobDelegate` with system prompt: "You are hebe's heartbeat. Read HEARTBEAT.md (provided below). For each item, perform the check. If everything is OK, reply with literally `OK`. Otherwise reply with a short summary of what needs attention."
    - Output: if response is exactly `"OK"` (after trim), silent. Else send via the configured `notify_channel` (default: web console; configurable to Telegram).
 
 3. Receipts capture every tool call as usual.

@@ -1,8 +1,8 @@
-Zde je český překlad souboru `README.md`**README.md** (původně označeného jako _Talos — brainstorming record_). Tento dokument slouží jako retrospektivní záznam rozhodovacího procesu a „metodika“ toho, jak projekt dospěl k aktuálnímu plánu verze v1.
+Zde je český překlad souboru `README.md`**README.md** (původně označeného jako _Hebe — brainstorming record_). Tento dokument slouží jako retrospektivní záznam rozhodovacího procesu a „metodika“ toho, jak projekt dospěl k aktuálnímu plánu verze v1.
 
 ### **README.md (Czech Translation)**
 
-# Talos — záznam brainstormingu (shrnuti diskuse)
+# Hebe — záznam brainstormingu (shrnuti diskuse)
 
 Chronologický záznam konverzace, která vyústila v aktuální plán verze v1. Účelem tohoto dokumentu je uchovat informaci o tom, **jak jsme se sem dostali** — tedy zdůvodnění, zvažované alternativy a momenty, kdy vstup uživatele změnil směřování projektu — nikoliv pouze finální rozhodnutí.
 
@@ -14,7 +14,7 @@ Pro samotná finální rozhodnutí viz:
 
 - `v1-tasks.md`[v1-tasks.md](https://www.google.com/search?q=v1-tasks.md) — seznam úkolů.
 
-- `talos-brainstorming-responses.md`[talos-brainstorming-responses.md](https://www.google.com/search?q=talos-brainstorming-responses.md) — odpovědi uživatele na otevřené otázky.
+- `hebe-brainstorming-responses.md`[hebe-brainstorming-responses.md](https://www.google.com/search?q=hebe-brainstorming-responses.md) — odpovědi uživatele na otevřené otázky.
 
 
 Toto je vrstva „zápisu z jednání“ a logu rozhodnutí nad výše uvedenými dokumenty.
@@ -32,7 +32,7 @@ Repozitář byl inicializován souborem `req.md` deklarujícím záměr („Kotl
 - `docs/minimax/` — MiniMax: komplexní seznam funkcí, doporučil Kotlin Native (proti proudu), zavedl pravidlo „vše jde přes nástroje“ a preemptivní prořezávání historie.
 
 
-Každý agent vytvořil vlastní soubory `talos-architecture.md`, `talos-features.md` a `talos-brainstorming.md` na základě kódových bází IronClaw/ZeroClaw a inspirací jako OpenClaw či Hermes Agent.
+Každý agent vytvořil vlastní soubory `hebe-architecture.md`, `hebe-features.md` a `hebe-brainstorming.md` na základě kódových bází IronClaw/ZeroClaw a inspirací jako OpenClaw či Hermes Agent.
 
 Prvním pokynem uživatele byla **syntéza** těchto návrhů do jednoho koherentního plánu, s využitím návrhu od Claude jako páteře, a vytvoření samostatného dokumentu (diff), který ukáže přínos každého agenta a v čem se lišili.
 
@@ -40,11 +40,11 @@ Prvním pokynem uživatele byla **syntéza** těchto návrhů do jednoho koheren
 
 Byly vytvořeny čtyři dokumenty:
 
-- `talos-architecture.md`[talos-architecture.md](https://www.google.com/search?q=talos-architecture.md) — propojil GPT pojmenování 5úrovňové paměti a rámec „MCP-as-sidecar“ s páteří od Claude; převzal od MiniMax preemptivní prořezávání, časovou degradaci (time decay), `tool_search`, catchup execution a tunelování; převzal od Gemini výběr implementací JGit/Fabric8; zamítl MiniMax strukturu modulů KMP a doporučení pro Native; zamítl Gemini hrubé rozvržení do 6 modulů.
+- `hebe-architecture.md`[hebe-architecture.md](https://www.google.com/search?q=hebe-architecture.md) — propojil GPT pojmenování 5úrovňové paměti a rámec „MCP-as-sidecar“ s páteří od Claude; převzal od MiniMax preemptivní prořezávání, časovou degradaci (time decay), `tool_search`, catchup execution a tunelování; převzal od Gemini výběr implementací JGit/Fabric8; zamítl MiniMax strukturu modulů KMP a doporučení pro Native; zamítl Gemini hrubé rozvržení do 6 modulů.
 
-- `talos-features.md`[talos-features.md](https://www.google.com/search?q=talos-features.md) — úplný seznam funkcí v1/v2/L sladěný s architekturou.
+- `hebe-features.md`[hebe-features.md](https://www.google.com/search?q=hebe-features.md) — úplný seznam funkcí v1/v2/L sladěný s architekturou.
 
-- `talos-brainstorming.md`[talos-brainstorming.md](https://www.google.com/search?q=talos-brainstorming.md) — pracovní dokument s názory, pushbacky, architektonickými sázkami a otevřenými otázkami, záměrně zaujímající vyhraněné pozice pro vyvolání diskuse s uživatelem.
+- `hebe-brainstorming.md`[hebe-brainstorming.md](https://www.google.com/search?q=hebe-brainstorming.md) — pracovní dokument s názory, pushbacky, architektonickými sázkami a otevřenými otázkami, záměrně zaujímající vyhraněné pozice pro vyvolání diskuse s uživatelem.
 
 - `agent-diff.md`[agent-diff.md](https://www.google.com/search?q=agent-diff.md) — přehledová tabulka srovnávající všechny čtyři agenty v ~25 dimenzích, detailní rozdíly a analýza shody/rozporů.
 
@@ -122,7 +122,7 @@ Dokumentace architektury a funkcí byla aktualizována:
 
 ## 5. Odpovědi z brainstormingu
 
-Uživatel odpověděl prostřednictvím souboru `talos-brainstorming-responses.md`[talos-brainstorming-responses.md](https://www.google.com/search?q=talos-brainstorming-responses.md) a uzavřel otevřené otázky:
+Uživatel odpověděl prostřednictvím souboru `hebe-brainstorming-responses.md`[hebe-brainstorming-responses.md](https://www.google.com/search?q=hebe-brainstorming-responses.md) a uzavřel otevřené otázky:
 
 |Téma|Rozhodnutí|Odůvodnění|
 |---|---|---|
@@ -131,15 +131,15 @@ Uživatel odpověděl prostřednictvím souboru `talos-brainstorming-responses.m
 |Web framework|HTMX / Svelte (žádný React)|Shoda na lehkosti.|
 |Rizika kubectl|High + vždy schvalovat mutace|Shoda na bezpečnosti.|
 |Databáze|SQLite pro v1|Shoda.|
-|**LLM provider**|**OpenAI API + BYOK**|Uživatel má interní LLM Gateway; talos dodá **jeden** OpenAI-compat klient.|
+|**LLM provider**|**OpenAI API + BYOK**|Uživatel má interní LLM Gateway; hebe dodá **jeden** OpenAI-compat klient.|
 |**Plugin loader**|**PF4J**|Přeskočen vývoj vlastního řešení; využití standardu.|
 |**Distribuce**|**OCI / Azure Container Registry (ACR)**|Pluginy jsou interní/firemní artefakty.|
 
-Klíčové zjednodušení: Díky internímu LLM Gateway odpadla nutnost řešit v rámci talos nativní adaptéry pro Anthropic, Bedrock či Gemini, a také komplexní fallback řetězce.
+Klíčové zjednodušení: Díky internímu LLM Gateway odpadla nutnost řešit v rámci hebe nativní adaptéry pro Anthropic, Bedrock či Gemini, a také komplexní fallback řetězce.
 
 ## 6. Architektura a funkce (druhý průchod)
 
-Oba hlavní dokumenty (`talos-architecture.md` a `talos-features.md`) byly aktualizovány:
+Oba hlavní dokumenty (`hebe-architecture.md` a `hebe-features.md`) byly aktualizovány:
 
 - TL;DR reflektuje všech osm klíčových rozhodnutí.
 
@@ -203,7 +203,7 @@ Ačkoliv je plán dostatečně konkrétní pro začátek kódování, během imp
 
 1. `req.md` — co uživatel chce (v jedné straně).
 
-2. `Talos Brainstorming.md` (tento soubor) — jak jsme se k plánu dopracovali.
+2. `Hebe Brainstorming.md` (tento soubor) — jak jsme se k plánu dopracovali.
 
 3. `v1-specs.md` — co je a co není ve v1.
 

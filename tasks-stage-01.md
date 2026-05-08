@@ -7,7 +7,7 @@
 - [ ] M1.T3: sqlite-vec extension loader
 
 ## Dependencies
-- M0.T8 (config module with TalosConfig)
+- M0.T8 (config module with HebeConfig)
 
 ## Notes
 - M1.T1 requires observability module for Observer events
