@@ -4,6 +4,7 @@ plugins {
 }
 
 dependencies {
+    api(project(":modules:api"))
     api(libs.kotlinx.coroutines.core)
     api(libs.kotlin.logging)
     api(libs.logback.classic)

@@ -44,3 +44,9 @@ CREATE TRIGGER memory_chunks_au AFTER UPDATE ON memory_chunks BEGIN
   INSERT INTO memory_chunks_fts(rowid, doc_path, chunk_idx, content)
   VALUES (new.rowid, new.doc_path, new.chunk_idx, new.content);
 END;
+
+CREATE VIRTUAL TABLE memory_chunks_vec USING vec0(
+  doc_path TEXT,
+  chunk_idx INTEGER,
+  embedding FLOAT[1536]
+);

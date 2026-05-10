@@ -19,7 +19,12 @@
       "Bash(mv talos.library.gradle.kts hebe.library.gradle.kts)",
       "Bash(mv talos.application.gradle.kts hebe.application.gradle.kts)",
       "Bash(mv talos.sh hebe.sh)",
-      "Bash(ls *.sh)"
+      "Bash(ls *.sh)",
+      "Bash(curl -s \"https://api.github.com/repos/asg017/sqlite-vec/releases/tags/v0.1.8\")",
+      "Bash(python3 -c \"import sys,json; r=json.load\\(sys.stdin\\); [print\\(a['name'], a['browser_download_url']\\) for a in r.get\\('assets',[]\\)]\")",
+      "Bash(curl -sI \"https://github.com/asg017/sqlite-vec/releases/download/v0.1.8/sqlite-vec-0.1.8-loadable-macos-aarch64.tar.gz\")",
+      "Bash(curl -s \"https://api.github.com/repos/asg017/sqlite-vec/releases\")",
+      "Bash(python3 -c \"import sys,json; rs=json.load\\(sys.stdin\\); [print\\(r['tag_name']\\) for r in rs[:5]]\")"
     ]
   }
 }

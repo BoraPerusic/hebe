@@ -1,67 +1,19 @@
 package com.hebe.plugin.api
 
-import java.time.Instant
-import kotlinx.coroutines.CoroutineScope
+import com.hebe.api.Observer
 
 interface PluginHost {
-    val capabilities: PluginCapabilities
-    val secrets: SecretStore
-    val httpClient: GatedHttpClient
+    val pluginId: String
+    val manifest: PluginManifest
 
-    fun registerCapability(capability: Capability): Unit
+    fun http(): GatedHttpClient
 
-    fun requestPermission(permission: Permission): PermissionResult
+    fun env(name: String): String?
 
-    fun createScopedScope(
-        parent: CoroutineScope,
-        name: String,
-    ): CoroutineScope
-}
+    fun secret(name: String): SecretHandle?
 
-interface PluginCapabilities {
-    fun <T : Capability> get(type: Class<T>): T?
-
-    fun <T : Capability> register(capability: T)
-}
-
-sealed interface Capability {
-    val name: String
-    val version: String
-}
-
-sealed interface Permission {
-    val name: String
-}
-
-sealed class PermissionResult {
-    data object Granted : PermissionResult()
-
-    data object Denied : PermissionResult()
-
-    data class Revoked(
-        val reason: String,
-    ) : PermissionResult()
-}
-
-interface SecretStore {
-    suspend fun get(key: String): SecretHandle?
-
-    suspend fun set(
-        key: String,
-        value: ByteArray,
-    ): Unit
-
-    suspend fun delete(key: String): Boolean
-}
-
-interface SecretHandle {
-    val value: ByteArray
-    val metadata: SecretMetadata
-}
-
-interface SecretMetadata {
-    val createdAt: Instant
-    val expiresAt: Instant?
+    val observer: Observer
+    val log: org.slf4j.Logger
 }
 
 interface GatedHttpClient {
@@ -72,36 +24,22 @@ interface GatedHttpClient {
 
     suspend fun post(
         url: String,
-        headers: Map<String, String> = emptyMap(),
-        body: ByteArray? = null,
-    ): HttpResponse
-
-    suspend fun put(
-        url: String,
-        headers: Map<String, String> = emptyMap(),
-        body: ByteArray? = null,
-    ): HttpResponse
-
-    suspend fun delete(
-        url: String,
+        body: ByteArray,
         headers: Map<String, String> = emptyMap(),
     ): HttpResponse
 }
 
 data class HttpResponse(
-    val statusCode: Int,
-    val headers: Map<String, String>,
-    val body: ByteArray?,
-) {
-    private companion object {
-        val OK_RANGE = 200..299
-        val REDIRECT_RANGE = 300..399
-        val CLIENT_ERROR_RANGE = 400..499
-        val SERVER_ERROR_RANGE = 500..599
-    }
+    val status: Int,
+    val headers: Map<String, List<String>>,
+    val body: ByteArray,
+)
 
-    val isOk: Boolean get() = statusCode in OK_RANGE
-    val isRedirect: Boolean get() = statusCode in REDIRECT_RANGE
-    val isClientError: Boolean get() = statusCode in CLIENT_ERROR_RANGE
-    val isServerError: Boolean get() = statusCode in SERVER_ERROR_RANGE
-}
+data class PluginManifest(
+    val hebeApiVersion: String,
+    val capabilities: Set<Capability>,
+    val permissions: Set<Permission>,
+    val allowlistDomains: List<String>,
+    val signature: String?,
+    val publisherKey: String?,
+)

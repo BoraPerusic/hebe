@@ -29,43 +29,52 @@ clikt               = "5.0.0"
 logstashEncoder     = "8.1"
 
 [libraries]
-kotlinx-coroutines-core   = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",   version.ref = "coroutines" }
+kotlinx-coroutines-core   = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core",     version.ref = "coroutines" }
 kotlinx-coroutines-test   = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test",     version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
 kotlinx-datetime          = { module = "org.jetbrains.kotlinx:kotlinx-datetime",            version.ref = "datetime" }
-koog-core                 = { module = "ai.koog:koog-core",                                version.ref = "koog" }
-koog-ktor                 = { module = "ai.koog:koog-ktor",                                version.ref = "koog" }
+koog-agents                 = { module = "ai.koog:koog-agents-jvm",                         version.ref = "koog" }
+koog-core                  = { module = "ai.koog:koog-agents-core-jvm",                      version.ref = "koog" }
+koog-utils                 = { module = "ai.koog:utils-jvm",                               version.ref = "koog" }
+koog-utils-common          = { module = "ai.koog:utils",                                    version.ref = "koog" }
+koog-tools                 = { module = "ai.koog:koog-agents-tools-jvm",                    version.ref = "koog" }
+koog-ktor                 = { module = "ai.koog:http-client-ktor-jvm",                      version.ref = "koog" }
+koog-prompt                 = { module = "ai.koog:prompt-llm-jvm",                          version.ref = "koog" }
 ktor-server-core           = { module = "io.ktor:ktor-server-core",                         version.ref = "ktor" }
-ktor-server-netty         = { module = "io.ktor:ktor-server-netty",                          version.ref = "ktor" }
+ktor-server-netty         = { module = "io.ktor:ktor-server-netty",                         version.ref = "ktor" }
 ktor-server-cnegot         = { module = "io.ktor:ktor-server-content-negotiation",          version.ref = "ktor" }
 ktor-server-sse           = { module = "io.ktor:ktor-server-sse",                           version.ref = "ktor" }
-ktor-server-websockets    = { module = "io.ktor:ktor-server-websockets",                   version.ref = "ktor" }
-ktor-server-auth           = { module = "io.ktor:ktor-server-auth",                          version.ref = "ktor" }
+ktor-server-websockets    = { module = "io.ktor:ktor-server-websockets",                    version.ref = "ktor" }
+ktor-server-auth           = { module = "io.ktor:ktor-server-auth",                         version.ref = "ktor" }
 ktor-serialization-json   = { module = "io.ktor:ktor-serialization-kotlinx-json",           version.ref = "ktor" }
 ktor-client-core          = { module = "io.ktor:ktor-client-core",                          version.ref = "ktor" }
 ktor-client-cio           = { module = "io.ktor:ktor-client-cio",                           version.ref = "ktor" }
-mcp-kotlin-sdk            = { module = "io.modelcontextprotocol:kotlin-sdk",                 version.ref = "mcp" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation",     version.ref = "ktor" }
+ktor-client-logging       = { module = "io.ktor:ktor-client-logging",                       version.ref = "ktor" }
+mcp-kotlin-sdk            = { module = "io.modelcontextprotocol:kotlin-sdk",                version.ref = "mcp" }
 sqlite-jdbc               = { module = "org.xerial:sqlite-jdbc",                            version.ref = "sqliteJdbc" }
 flyway-core               = { module = "org.flywaydb:flyway-core",                          version.ref = "flyway" }
 telegrambots              = { module = "org.telegram:telegrambots",                         version.ref = "telegram" }
 jgit                      = { module = "org.eclipse.jgit:org.eclipse.jgit",                 version.ref = "jgit" }
 bouncycastle              = { module = "org.bouncycastle:bcprov-jdk18on",                   version.ref = "bouncycastle" }
 pf4j                      = { module = "org.pf4j:pf4j",                                     version.ref = "pf4j" }
-oras-sdk                  = { module = "land.oras:oras-java-sdk",                            version.ref = "oras" }
+oras-sdk                  = { module = "land.oras:oras-java-sdk",                           version.ref = "oras" }
 tomlj                     = { module = "org.tomlj:tomlj",                                   version.ref = "tomlj" }
 kotlin-logging            = { module = "io.github.oshai:kotlin-logging-jvm",                version.ref = "kotlinLogging" }
-logback-classic           = { module = "ch.qos.logback:logback-classic",                   version.ref = "logback" }
-logstash-logback-encoder = { module = "net.logstash.logback:logstash-logback-encoder",     version.ref = "logstashEncoder" }
+logback-classic           = { module = "ch.qos.logback:logback-classic",                    version.ref = "logback" }
+logstash-logback-encoder = { module = "net.logstash.logback:logstash-logback-encoder",      version.ref = "logstashEncoder" }
 otel-api                  = { module = "io.opentelemetry:opentelemetry-api",                version.ref = "otel" }
 junit-jupiter             = { module = "org.junit.jupiter:junit-jupiter",                   version.ref = "junit" }
 junit-platform-launcher   = { module = "org.junit.platform:junit-platform-launcher" }
 kotest-assertions         = { module = "io.kotest:kotest-assertions-core",                  version.ref = "kotest" }
-kotest-framework-engine   = { module = "io.kotest:kotest-framework-engine",              version.ref = "kotest" }
-kotest-junit-platform     = { module = "io.kotest:kotest-junit-platform",                 version.ref = "kotest" }
+kotest-framework-engine   = { module = "io.kotest:kotest-framework-engine",                 version.ref = "kotest" }
+kotest-junit-platform-runner = { module = "io.kotest:kotest-runner-junit5-jvm",             version.ref = "kotest" }
+kotest-property            = { module = "io.kotest:kotest-property",                        version.ref = "kotest" }
 mockk                     = { module = "io.mockk:mockk",                                    version.ref = "mockk" }
-testcontainers             = { module = "org.testcontainers:testcontainers",                  version.ref = "testcontainers" }
+testcontainers             = { module = "org.testcontainers:testcontainers",                version.ref = "testcontainers" }
 clikt                     = { module = "com.github.ajalt.clikt:clikt",                      version.ref = "clikt" }
-detekt-api                = { module = "io.gitlab.arturbosch.detekt:detekt-api",              version.ref = "detekt" }
+detekt-api                = { module = "io.gitlab.arturbosch.detekt:detekt-api",            version.ref = "detekt" }
+detekt-test               = { module = "io.gitlab.arturbosch.detekt:detekt-test",           version.ref = "detekt" }
 
 [bundles]
 ktor-server = [
@@ -77,9 +86,9 @@ ktor-server = [
     "ktor-server-auth",
     "ktor-serialization-json",
 ]
-ktor-client = ["ktor-client-core", "ktor-client-cio"]
+ktor-client = ["ktor-client-core", "ktor-client-cio", "ktor-client-content-negotiation", "ktor-client-logging", "ktor-serialization-json"]
 logging     = ["kotlin-logging", "logback-classic"]
-testing     = ["junit-jupiter", "kotest-assertions", "mockk"]
+testing     = ["junit-jupiter", "kotest-assertions", "kotest-property", "mockk"]
 
 [plugins]
 kotlin-jvm            = { id = "org.jetbrains.kotlin.jvm",                  version.ref = "kotlin" }

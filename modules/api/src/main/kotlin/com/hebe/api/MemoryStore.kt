@@ -32,7 +32,7 @@ interface MemoryStore {
 
     suspend fun listDocs(prefix: String): List<String>
 
-    suspend fun systemPrompt(): String
+    suspend fun systemPrompt(isGroup: Boolean = false): String
 
     suspend fun snapshot(): MemorySnapshot
 }

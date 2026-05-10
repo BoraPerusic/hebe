@@ -1,3 +1,5 @@
+@file:Suppress("detekt:MagicNumber", "detekt:UnusedPrivateProperty")
+
 package com.hebe.memory.search
 
 import com.hebe.api.MemoryCategory
@@ -88,7 +90,6 @@ class Searcher(
         return hits
     }
 
-    @Suppress("UNUSED_PARAMETER")
     private fun vecQuery(
         queryVec: FloatArray,
         limit: Int,
@@ -106,12 +107,15 @@ class Searcher(
                     JOIN memory_docs md ON md.path = mc.doc_path
                     WHERE md.scope = ?
                       ${if (categories != null) "AND md.category IN (${categories.joinToString { "'${it.name}'" }})" else ""}
-                    ORDER BY mcv.distance
+                      AND vec_distance_cosine(mcv.embedding, ?) < 1.0
+                    ORDER BY vec_distance_cosine(mcv.embedding, ?)
                     LIMIT ?
                     """.trimIndent(),
                 ).use { ps ->
-                    ps.setString(PARAM_SCOPE_VEC, scope.name)
-                    ps.setInt(PARAM_LIMIT_VEC, limit)
+                    ps.setString(1, scope.name)
+                    ps.setBytes(2, floatArrayToBytes(queryVec))
+                    ps.setBytes(3, floatArrayToBytes(queryVec))
+                    ps.setInt(4, limit)
                     val rs = ps.executeQuery()
                     while (rs.next()) {
                         hits.add(
@@ -125,5 +129,11 @@ class Searcher(
                 }
         }
         return hits
+    }
+
+    private fun floatArrayToBytes(vec: FloatArray): ByteArray {
+        val buffer = java.nio.ByteBuffer.allocate(vec.size * 4)
+        for (v in vec) buffer.putFloat(v)
+        return buffer.array()
     }
 }

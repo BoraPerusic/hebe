@@ -23,6 +23,7 @@ object DbFactory {
         ds.url = "jdbc:sqlite:$path?journal_mode=WAL&busy_timeout=5000&foreign_keys=on"
 
         ds.connection.use { conn ->
+            tryLoadVecExtension(conn)
             conn.createStatement().use { st ->
                 st.execute("PRAGMA journal_mode=WAL")
                 st.execute("PRAGMA synchronous=NORMAL")
@@ -46,6 +47,7 @@ object DbFactory {
         ds.url = "jdbc:sqlite::memory:"
 
         ds.connection.use { conn ->
+            tryLoadVecExtension(conn)
             conn.createStatement().use { st ->
                 st.execute("PRAGMA foreign_keys=ON")
                 st.execute("PRAGMA journal_mode=WAL")
@@ -54,6 +56,17 @@ object DbFactory {
 
         migrate(ds)
         return Db(ds, isInMemory = true)
+    }
+
+    @Suppress("detekt:TooGenericExceptionCaught")
+    private fun tryLoadVecExtension(conn: java.sql.Connection) {
+        try {
+            SqliteVecExtension.load(conn)
+        } catch (e: Exception) {
+            System.err.println(
+                "Warning: failed to load sqlite-vec extension: ${e.message}. Vector search will be disabled.",
+            )
+        }
     }
 }
 

@@ -1,8 +1,8 @@
 package com.hebe.memory.integration
 
+import com.hebe.api.HebeException
 import com.hebe.api.MemoryCategory
 import com.hebe.api.MemoryScope
-import com.hebe.api.HebeException
 import com.hebe.memory.SqliteMemoryStore
 import com.hebe.memory.db.DbFactory
 import com.hebe.memory.embeddings.MockEmbeddingProvider

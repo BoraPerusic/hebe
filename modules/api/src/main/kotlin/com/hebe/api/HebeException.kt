@@ -9,15 +9,19 @@ sealed class HebeException(
     ) : HebeException(message)
 
     class Provider(
+        val retriable: Boolean,
         message: String,
         cause: Throwable? = null,
     ) : HebeException(message, cause)
 
     class Tool(
+        val tool: String,
+        val retriable: Boolean,
         message: String,
     ) : HebeException(message)
 
     class Plugin(
+        val pluginId: String,
         message: String,
         cause: Throwable? = null,
     ) : HebeException(message, cause)
@@ -39,6 +43,7 @@ sealed class HebeException(
     ) : HebeException(message)
 
     class Channel(
+        val channel: String,
         message: String,
         cause: Throwable? = null,
     ) : HebeException(message, cause)

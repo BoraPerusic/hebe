@@ -1,3 +1,5 @@
+@file:Suppress("detekt:MagicNumber", "detekt:UnusedPrivateProperty")
+
 package com.hebe.memory.chunker
 
 data class ChunkerConfig(
@@ -14,13 +16,15 @@ data class Chunk(
 
 object Chunker {
     private const val HEADING_SEARCH_THRESHOLD = 0.7
-    private val HEADING_PATTERN = Regex("^#{1,6}\\s+")
 
     @Suppress("ReturnCount", "LoopWithTooManyJumpStatements")
     fun chunk(
         text: String,
         cfg: ChunkerConfig = ChunkerConfig(),
     ): List<Chunk> {
+        val lines = text.split("\n")
+        if (lines.isEmpty()) return emptyList()
+
         val tokens = text.split(Regex("\\s+")).filter { it.isNotEmpty() }
         if (tokens.isEmpty()) return emptyList()
 
@@ -37,7 +41,7 @@ object Chunker {
             val end = (start + cfg.targetWords).coerceAtMost(tokens.size)
             val chunkTokens = tokens.subList(start, end)
 
-            val breakAt = findHeadingBreakPoint(chunkTokens)
+            val breakAt = findHeadingBreakPoint(chunkTokens, lines, start, end)
             val actualEnd = breakAt ?: end
 
             val actualChunkTokens = tokens.subList(start, actualEnd)
@@ -62,13 +66,41 @@ object Chunker {
         return chunks.mapIndexed { i, c -> c.copy(index = i) }
     }
 
-    private fun findHeadingBreakPoint(tokens: List<String>): Int? {
+    @Suppress("detekt:UnusedParameter")
+    private fun findHeadingBreakPoint(
+        tokens: List<String>,
+        lines: List<String>,
+        start: Int,
+        end: Int,
+    ): Int? {
         val threshold = (tokens.size * HEADING_SEARCH_THRESHOLD).toInt().coerceAtLeast(1)
+        val lineThreshold = (lines.size * 0.7).toInt().coerceAtLeast(1)
+
         for (i in threshold until tokens.size) {
-            if (HEADING_PATTERN.containsMatchIn(tokens[i])) {
-                return i
+            val tokenPos = start + i
+            val lineIdx = findLineIndexForTokenPosition(lines, tokenPos)
+            if (lineIdx >= 0 && lineIdx < lines.size) {
+                val line = lines[lineIdx]
+                if (line.trimStart().startsWith("#")) {
+                    return i
+                }
             }
         }
         return null
+    }
+
+    private fun findLineIndexForTokenPosition(
+        lines: List<String>,
+        tokenPosition: Int,
+    ): Int {
+        var tokenCount = 0
+        for ((idx, line) in lines.withIndex()) {
+            val lineTokens = line.split(Regex("\\s+")).filter { it.isNotEmpty() }
+            if (tokenCount + lineTokens.size > tokenPosition) {
+                return idx
+            }
+            tokenCount += lineTokens.size
+        }
+        return lines.size - 1
     }
 }

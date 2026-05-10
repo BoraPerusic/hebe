@@ -28,6 +28,7 @@ sealed class ObserverEvent {
     data class TurnStart(
         val sessionId: String,
         val turnId: String,
+        val channel: String? = null,
     ) : ObserverEvent()
 
     @Serializable
@@ -36,6 +37,7 @@ sealed class ObserverEvent {
         val sessionId: String,
         val turnId: String,
         val outcome: String,
+        val channel: String? = null,
     ) : ObserverEvent()
 
     @Serializable
@@ -75,5 +77,11 @@ sealed class ObserverEvent {
     data class MemoryDbReady(
         val version: String?,
         val applied: Int,
+    ) : ObserverEvent()
+
+    @Serializable
+    @SerialName("plugin_loaded")
+    data class PluginLoaded(
+        val pluginId: String,
     ) : ObserverEvent()
 }

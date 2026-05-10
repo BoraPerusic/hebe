@@ -30,26 +30,14 @@ enum class DiagnosticLevel {
     ERROR,
 }
 
+const val DEFAUTL_EMBEDDING_DIM = 1536
+
+@Suppress("detekt:TooManyFunctions", "detekt:ComplexCondition")
 class ConfigLoader {
     fun load(path: Path): ConfigResult<HebeConfig> {
         val diagnostics = mutableListOf<ConfigDiagnostic>()
         val tomlResult = tryParseToml(path, diagnostics) ?: return ConfigResult.Error(diagnostics)
-
-        val version = tomlResult.getString("version") ?: ConfigFormats.CURRENT
-        if (version !in ConfigFormats.SUPPORTED) {
-            diagnostics.add(
-                ConfigDiagnostic(
-                    level = DiagnosticLevel.WARNING,
-                    message = "Unknown config version '$version', expected one of ${ConfigFormats.SUPPORTED}",
-                    source = path.toString(),
-                    line = null,
-                    column = null,
-                ),
-            )
-        }
-
         val config = parseConfig(tomlResult, diagnostics)
-
         return if (diagnostics.any { it.level == DiagnosticLevel.ERROR }) {
             ConfigResult.Error(diagnostics)
         } else {
@@ -80,171 +68,218 @@ class ConfigLoader {
         toml: TomlTable,
         diagnostics: MutableList<ConfigDiagnostic>,
     ): HebeConfig {
-        val observability = parseObservability(toml.getTable("observability"), diagnostics)
-        val security = parseSecurity(toml.getTable("security"), diagnostics)
-        val plugins = parsePlugins(toml.getTable("plugins"))
-        val channels = parseChannels(toml.getTable("channels"))
-        val providers = parseProviders(toml.getTable("providers"))
-        val memory = parseMemory(toml.getTable("memory"))
+        val hebe = parseHebe(toml.getTable("hebe"))
+        val llm = parseLlm(toml.getTable("llm"), diagnostics)
+        val autonomy = parseAutonomy(toml.getTable("autonomy"))
+        val security = parseSecurity(toml.getTable("security"))
         val scheduler = parseScheduler(toml.getTable("scheduler"))
-        val api = parseApi(toml.getTable("api"))
-
+        val channels = parseChannels(toml.getTable("channels"))
+        val plugins = parsePlugins(toml.getTable("plugins"))
+        val mcp = parseMcp(toml.getTable("mcp"))
         return HebeConfig(
-            version = toml.getString("version") ?: ConfigFormats.CURRENT,
-            observability = observability,
+            hebe = hebe,
+            llm = llm,
+            autonomy = autonomy,
             security = security,
-            plugins = plugins,
-            channels = channels,
-            providers = providers,
-            memory = memory,
             scheduler = scheduler,
-            api = api,
+            channels = channels,
+            plugins = plugins,
+            mcp = mcp,
         )
     }
 
-    private fun parseObservability(
-        table: TomlTable?,
-        diagnostics: MutableList<ConfigDiagnostic>,
-    ): ObservabilityConfig {
-        if (table == null) {
-            addInfo(diagnostics, "observability section missing, using defaults")
-            return ObservabilityConfig(
-                level = ConfigDefaults.OBSERVABILITY_LEVEL,
-                otelEndpoint = null,
-                otelProtocol = ConfigDefaults.OTEL_PROTOCOL,
-                logFile = null,
-            )
-        }
-        return ObservabilityConfig(
-            level = table.getString("level") ?: ConfigDefaults.OBSERVABILITY_LEVEL,
-            otelEndpoint = table.getString("otelEndpoint"),
-            otelProtocol = table.getString("otelProtocol") ?: ConfigDefaults.OTEL_PROTOCOL,
-            logFile = table.getString("logFile"),
+    private fun parseHebe(table: TomlTable?): HebeSection {
+        if (table == null) return HebeSection()
+        return HebeSection(
+            dataDir = table.getString("data_dir") ?: "~/.hebe",
+            logLevel = table.getString("log_level") ?: "info",
         )
     }
 
-    private fun parseSecurity(
+    private fun parseLlm(
         table: TomlTable?,
         diagnostics: MutableList<ConfigDiagnostic>,
-    ): SecurityConfig {
+    ): LlmSection {
         if (table == null) {
-            addInfo(diagnostics, "security section missing, using defaults")
-            return SecurityConfig(
-                secretStore = SecretStoreConfig(provider = "memory", keychainService = null),
-                mfaRequired = false,
-            )
-        }
-        val secretStoreTable = table.getTable("secretStore")
-        return SecurityConfig(
-            secretStore =
-                SecretStoreConfig(
-                    provider = secretStoreTable?.getString("provider") ?: "memory",
-                    keychainService = secretStoreTable?.getString("keychainService"),
+            diagnostics.add(
+                ConfigDiagnostic(
+                    level = DiagnosticLevel.ERROR,
+                    message = "Missing required [llm] section",
+                    source = null,
+                    line = null,
+                    column = null,
                 ),
-            mfaRequired = table.getBoolean("mfaRequired") ?: false,
-        )
-    }
-
-    private fun parsePlugins(table: TomlTable?): PluginConfig {
-        if (table == null) {
-            return PluginConfig(directory = "plugins", autoLoad = true, allowedPlugins = emptyList())
+            )
+            return LlmSection("", "", "", "", DEFAUTL_EMBEDDING_DIM)
         }
-        @Suppress("UNCHECKED_CAST")
-        val allowedRaw = table.get("allowedPlugins") as? List<*>
-        val allowed = allowedRaw?.filterIsInstance<String>() ?: emptyList()
-        return PluginConfig(
-            directory = table.getString("directory") ?: "plugins",
-            autoLoad = table.getBoolean("autoLoad") ?: true,
-            allowedPlugins = allowed,
-        )
-    }
-
-    private fun parseChannels(table: TomlTable?): ChannelConfig {
-        if (table == null) {
-            return ChannelConfig(
-                defaultTimeoutSeconds = ConfigDefaults.CHANNEL_TIMEOUT_SECONDS,
-                maxRetries = ConfigDefaults.CHANNEL_MAX_RETRIES,
-                retryDelayMs = ConfigDefaults.CHANNEL_RETRY_DELAY_MS,
+        val baseUrl = table.getString("base_url")
+        val apiKeySecret = table.getString("api_key_secret")
+        val defaultModel = table.getString("default_model")
+        val embeddingModel = table.getString("embedding_model")
+        if (baseUrl == null || apiKeySecret == null || defaultModel == null || embeddingModel == null) {
+            diagnostics.add(
+                ConfigDiagnostic(
+                    level = DiagnosticLevel.ERROR,
+                    message = "[llm] section requires base_url, api_key_secret, default_model, embedding_model",
+                    source = null,
+                    line = null,
+                    column = null,
+                ),
             )
         }
-        return ChannelConfig(
-            defaultTimeoutSeconds =
-                table.getLong("defaultTimeoutSeconds")?.toInt()
-                    ?: ConfigDefaults.CHANNEL_TIMEOUT_SECONDS,
-            maxRetries = table.getLong("maxRetries")?.toInt() ?: ConfigDefaults.CHANNEL_MAX_RETRIES,
-            retryDelayMs = table.getLong("retryDelayMs")?.toInt() ?: ConfigDefaults.CHANNEL_RETRY_DELAY_MS,
+        return LlmSection(
+            baseUrl = baseUrl ?: "",
+            apiKeySecret = apiKeySecret ?: "",
+            defaultModel = defaultModel ?: "",
+            embeddingModel = embeddingModel ?: "",
+            embeddingDim = table.getLong("embedding_dim")?.toInt() ?: DEFAUTL_EMBEDDING_DIM,
         )
     }
 
-    private fun parseProviders(table: TomlTable?): ProviderConfig {
-        if (table == null) {
-            return ProviderConfig(
-                defaultModel = null,
-                fallbackModel = null,
-                maxConcurrentRequests = ConfigDefaults.PROVIDER_MAX_CONCURRENT,
-            )
+    private fun parseAutonomy(table: TomlTable?): AutonomySection {
+        if (table == null) return AutonomySection()
+        val levelStr = table.getString("level") ?: "Supervised"
+        val level =
+            try {
+                AutonomyLevel.valueOf(levelStr.replaceFirstChar { it.uppercase() })
+            } catch (_: Exception) {
+                AutonomyLevel.Supervised
+            }
+        return AutonomySection(level = level)
+    }
+
+    private fun parseSecurity(table: TomlTable?): SecuritySection {
+        if (table == null) return SecuritySection()
+        return SecuritySection(
+            forbiddenPaths = getStringList(table, "forbidden_paths"),
+            allowedCommandGlobs = getStringList(table, "allowed_command_globs"),
+            forbiddenCommandGlobs = getStringList(table, "forbidden_command_globs"),
+            httpAllowlistDomains = getStringList(table, "http_allowlist_domains"),
+            pluginSignatureMode =
+                table.getString("plugin_signature_mode")?.let {
+                    try {
+                        PluginSignatureMode.valueOf(it)
+                    } catch (_: Exception) {
+                        PluginSignatureMode.OPTIONAL
+                    }
+                } ?: PluginSignatureMode.OPTIONAL,
+        )
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun getStringList(
+        table: TomlTable,
+        key: String,
+    ): List<String> {
+        val value = table.get(key)
+        return if (value is java.util.List<*>) {
+            (value as List<*>).filterIsInstance<String>()
+        } else {
+            emptyList()
         }
-        return ProviderConfig(
-            defaultModel = table.getString("defaultModel"),
-            fallbackModel = table.getString("fallbackModel"),
-            maxConcurrentRequests =
-                table.getLong("maxConcurrentRequests")?.toInt()
-                    ?: ConfigDefaults.PROVIDER_MAX_CONCURRENT,
+    }
+
+    private fun parseScheduler(table: TomlTable?): SchedulerSection {
+        if (table == null) return SchedulerSection()
+        return SchedulerSection(
+            heartbeatCron = table.getString("heartbeat_cron") ?: "0 */6 * * *",
+            dailyDigestCron = table.getString("daily_digest_cron") ?: "5 0 * * *",
+            summarisationCron = table.getString("summarisation_cron") ?: "*/30 * * * *",
+            factExtractCron = table.getString("fact_extract_cron") ?: "10 * * * *",
         )
     }
 
-    private fun parseMemory(table: TomlTable?): MemoryConfig {
-        if (table == null) {
-            return MemoryConfig(
-                maxHistoryTokens = ConfigDefaults.MEMORY_MAX_HISTORY_TOKENS,
-                retentionDays = ConfigDefaults.MEMORY_RETENTION_DAYS,
-                vectorDbPath = null,
-            )
-        }
-        return MemoryConfig(
-            maxHistoryTokens =
-                table.getLong("maxHistoryTokens")?.toInt()
-                    ?: ConfigDefaults.MEMORY_MAX_HISTORY_TOKENS,
-            retentionDays = table.getLong("retentionDays")?.toInt() ?: ConfigDefaults.MEMORY_RETENTION_DAYS,
-            vectorDbPath = table.getString("vectorDbPath"),
+    private fun parseChannels(table: TomlTable?): ChannelsSection {
+        if (table == null) return ChannelsSection()
+        val cliTable = table.getTable("cli")
+        val webTable = table.getTable("web")
+        val telegramTable = table.getTable("telegram")
+        return ChannelsSection(
+            cli = parseCliChannel(cliTable),
+            web = parseWebChannel(webTable),
+            telegram = parseTelegramChannel(telegramTable),
         )
     }
 
-    private fun parseScheduler(table: TomlTable?): SchedulerConfig {
-        if (table == null) {
-            return SchedulerConfig(
-                maxQueueSize = ConfigDefaults.SCHEDULER_MAX_QUEUE_SIZE,
-                workerPoolSize = ConfigDefaults.SCHEDULER_WORKER_POOL_SIZE,
-            )
-        }
-        return SchedulerConfig(
-            maxQueueSize = table.getLong("maxQueueSize")?.toInt() ?: ConfigDefaults.SCHEDULER_MAX_QUEUE_SIZE,
-            workerPoolSize = table.getLong("workerPoolSize")?.toInt() ?: ConfigDefaults.SCHEDULER_WORKER_POOL_SIZE,
+    private fun parseCliChannel(table: TomlTable?): CliChannelConfig {
+        if (table == null) return CliChannelConfig()
+        return CliChannelConfig(
+            enabled = table.getBoolean("enabled") ?: true,
         )
     }
 
-    private fun parseApi(table: TomlTable?): ApiConfig {
-        if (table == null) {
-            return ApiConfig(
-                host = ConfigDefaults.API_HOST,
-                port = ConfigDefaults.API_PORT,
-                corsOrigins = emptyList(),
-            )
-        }
-        @Suppress("UNCHECKED_CAST")
-        val corsRaw = table.get("corsOrigins") as? List<*>
-        val corsList = corsRaw?.filterIsInstance<String>() ?: emptyList()
-        return ApiConfig(
-            host = table.getString("host") ?: ConfigDefaults.API_HOST,
-            port = table.getLong("port")?.toInt() ?: ConfigDefaults.API_PORT,
-            corsOrigins = corsList,
+    private fun parseWebChannel(table: TomlTable?): WebChannelConfig {
+        if (table == null) return WebChannelConfig()
+        return WebChannelConfig(
+            enabled = table.getBoolean("enabled") ?: true,
+            bind = table.getString("bind") ?: "127.0.0.1",
+            port = table.getLong("port")?.toInt() ?: 8765,
+            adminPasswordSecret = table.getString("admin_password_secret") ?: "web.password",
         )
     }
 
-    private fun addInfo(
-        diagnostics: MutableList<ConfigDiagnostic>,
-        message: String,
-    ) {
-        diagnostics.add(ConfigDiagnostic(DiagnosticLevel.INFO, message, null, null, null))
+    private fun parseTelegramChannel(table: TomlTable?): TelegramChannelConfig {
+        if (table == null) return TelegramChannelConfig()
+        return TelegramChannelConfig(
+            enabled = table.getBoolean("enabled") ?: false,
+            botTokenSecret = table.getString("bot_token_secret") ?: "telegram.bot_token",
+            operatorTelegramId = table.getLong("operator_telegram_id") ?: 0L,
+        )
     }
+
+    private fun parsePlugins(table: TomlTable?): PluginsSection {
+        if (table == null) return PluginsSection()
+        return PluginsSection(
+            registry = table.getString("registry") ?: "",
+            autoPull = getStringList(table, "auto_pull"),
+            publisherKeys = getStringList(table, "publisher_keys"),
+        )
+    }
+
+    private fun parseMcp(table: TomlTable?): McpSection {
+        if (table == null) return McpSection()
+        val serverTable = table.getTable("server")
+        val clientTable = table.getTable("client")
+        return McpSection(
+            server = parseMcpServer(serverTable),
+            client = parseMcpClient(clientTable),
+        )
+    }
+
+    private fun parseMcpServer(table: TomlTable?): McpServerConfig {
+        if (table == null) return McpServerConfig()
+        return McpServerConfig(
+            enabled = table.getBoolean("enabled") ?: true,
+            stdio = table.getBoolean("stdio") ?: true,
+            httpBind = table.getString("http_bind") ?: "",
+            httpPort = table.getLong("http_port")?.toInt() ?: 0,
+        )
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseMcpClient(table: TomlTable?): McpClientConfig {
+        if (table == null) return McpClientConfig()
+        val serversArray = table.getArray("servers")
+        val serversList =
+            if (serversArray != null) {
+                (0 until serversArray.size())
+                    .mapNotNull { serversArray.getTable(it) }
+                    .mapNotNull { parseMcpClientServerFromTable(it) }
+            } else {
+                emptyList()
+            }
+        return McpClientConfig(servers = serversList)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseMcpClientServerFromTable(t: TomlTable): McpClientServerConfig =
+        McpClientServerConfig(
+            name = t.getString("name") ?: "",
+            transport = t.getString("transport") ?: "stdio",
+            command = emptyList(),
+            envSecrets = emptyMap(),
+            alwaysTools = emptyList(),
+            dynamicTools = emptyList(),
+            dynamicKeywords = emptyList(),
+        )
 }

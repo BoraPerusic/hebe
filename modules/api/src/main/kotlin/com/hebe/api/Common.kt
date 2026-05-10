@@ -9,8 +9,6 @@ enum class RiskLevel {
     High,
 }
 
-typealias WorkspacePath = String
-
 interface SecretLookup {
     fun secret(name: String): String?
 }

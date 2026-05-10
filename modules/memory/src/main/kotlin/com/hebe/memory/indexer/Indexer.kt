@@ -1,3 +1,5 @@
+@file:Suppress("detekt:MagicNumber", "detekt:UnusedPrivateProperty")
+
 package com.hebe.memory.indexer
 
 import com.hebe.api.MemoryCategory
@@ -5,6 +7,7 @@ import com.hebe.api.MemoryScope
 import com.hebe.memory.chunker.Chunk
 import com.hebe.memory.chunker.Chunker
 import com.hebe.memory.db.Db
+import com.hebe.memory.embeddings.EmbeddingProvider
 import com.hebe.memory.workspace.WorkspacePath
 import java.security.MessageDigest
 import kotlinx.coroutines.Dispatchers
@@ -12,6 +15,7 @@ import kotlinx.coroutines.withContext
 
 class Indexer(
     private val db: Db,
+    private val embeddings: EmbeddingProvider,
 ) {
     companion object {
         private const val PARAM_DOC_PATH = 1
@@ -41,9 +45,11 @@ class Indexer(
             conn.setAutoCommit(false)
             try {
                 deleteChunks(path.value, conn)
+                deleteVecRows(path.value, conn)
                 upsertDoc(path.value, content, scope, category, hash, now, conn)
                 val chunks = Chunker.chunk(content)
                 insertChunks(path.value, chunks, now, conn)
+                insertVecRows(path.value, chunks, conn)
                 conn.commit()
             } catch (
                 @Suppress("TooGenericExceptionCaught") ex: Exception,
@@ -75,6 +81,16 @@ class Indexer(
         conn: java.sql.Connection,
     ) {
         conn.prepareStatement("DELETE FROM memory_chunks WHERE doc_path = ?").use { ps ->
+            ps.setString(PARAM_DOC_PATH, path)
+            ps.executeUpdate()
+        }
+    }
+
+    private fun deleteVecRows(
+        path: String,
+        conn: java.sql.Connection,
+    ) {
+        conn.prepareStatement("DELETE FROM memory_chunks_vec WHERE doc_path = ?").use { ps ->
             ps.setString(PARAM_DOC_PATH, path)
             ps.executeUpdate()
         }
@@ -138,6 +154,36 @@ class Indexer(
                 }
                 ps.executeBatch()
             }
+    }
+
+    private suspend fun insertVecRows(
+        path: String,
+        chunks: List<Chunk>,
+        conn: java.sql.Connection,
+    ) {
+        val texts = chunks.map { it.content }
+        val vectors = embeddings.embed(texts)
+        conn
+            .prepareStatement(
+                """
+                INSERT INTO memory_chunks_vec (doc_path, chunk_idx, embedding)
+                VALUES (?, ?, ?)
+                """.trimIndent(),
+            ).use { ps ->
+                for ((i, chunk) in chunks.withIndex()) {
+                    ps.setString(PARAM_DOC_PATH, path)
+                    ps.setInt(PARAM_CHUNK_IDX, chunk.index)
+                    ps.setBytes(3, floatArrayToBytes(vectors[i]))
+                    ps.addBatch()
+                }
+                ps.executeBatch()
+            }
+    }
+
+    private fun floatArrayToBytes(vec: FloatArray): ByteArray {
+        val buffer = java.nio.ByteBuffer.allocate(vec.size * 4)
+        for (v in vec) buffer.putFloat(v)
+        return buffer.array()
     }
 
     private fun sha256(text: String): String {

@@ -115,3 +115,37 @@ modules:
 # Show module dependencies
 deps module:
     ./gradlew :{{module}}:dependencies --no-configuration-cache
+
+# =============================================================================
+# 🗄️ SQLITE-VEC
+# =============================================================================
+
+# Download sqlite-vec native binaries for all supported platforms.
+# Must be re-run whenever the version in gradle/libs.versions.toml changes.
+download-sqlite-vec:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    VERSION=$(grep 'sqliteVec' gradle/libs.versions.toml | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+    DEST=modules/memory/src/main/resources/native/sqlite-vec
+    BASE=https://github.com/asg017/sqlite-vec/releases/download/v${VERSION}
+
+    declare -A ASSETS=(
+        ["darwin-aarch64/vec0.dylib"]="sqlite-vec-${VERSION}-loadable-macos-aarch64.tar.gz"
+        ["darwin-x86_64/vec0.dylib"]="sqlite-vec-${VERSION}-loadable-macos-x86_64.tar.gz"
+        ["linux-aarch64/vec0.so"]="sqlite-vec-${VERSION}-loadable-linux-aarch64.tar.gz"
+        ["linux-x86_64/vec0.so"]="sqlite-vec-${VERSION}-loadable-linux-x86_64.tar.gz"
+    )
+
+    for target in "${!ASSETS[@]}"; do
+        asset="${ASSETS[$target]}"
+        dir=$(dirname "$target")
+        file=$(basename "$target")
+        mkdir -p "$DEST/$dir"
+        tmpdir=$(mktemp -d)
+        echo "Downloading $asset ..."
+        curl -fsSL "$BASE/$asset" | tar -xz -C "$tmpdir"
+        cp "$tmpdir/$file" "$DEST/$target"
+        rm -rf "$tmpdir"
+        echo "  -> $DEST/$target"
+    done
+    echo "Done. sqlite-vec v${VERSION} binaries are ready."

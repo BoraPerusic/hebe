@@ -1,15 +1,16 @@
+@file:Suppress("detekt:MagicNumber", "detekt:UnusedPrivateProperty")
+
 package com.hebe.memory
 
 import com.hebe.api.ChatRole
 import com.hebe.api.ConversationMessage
+import com.hebe.api.HebeException
 import com.hebe.api.MemoryCategory
 import com.hebe.api.MemoryHit
 import com.hebe.api.MemoryScope
 import com.hebe.api.MemorySnapshot
 import com.hebe.api.MemoryStore
 import com.hebe.api.Observer
-import com.hebe.api.ObserverEvent
-import com.hebe.api.HebeException
 import com.hebe.memory.db.Db
 import com.hebe.memory.embeddings.EmbeddingProvider
 import com.hebe.memory.hygiene.HygieneResult
@@ -34,21 +35,20 @@ class SqliteMemoryStore(
 ) : MemoryStore {
     companion object {
         private const val PARAM_CONV_ID = 1
-        private const val PARAM_MSG_ID = 2
-        private const val PARAM_ROLE = 3
-        private const val PARAM_CONTENT = 4
-        private const val PARAM_TOOL_CALLS = 5
-        private const val PARAM_TS = 6
+        private const val PARAM_CHANNEL = 2
+        private const val PARAM_USER_ID = 3
+        private const val PARAM_STARTED_AT = 4
+        private const val PARAM_MSG_ID = 5
+        private const val PARAM_ROLE = 6
+        private const val PARAM_CONTENT = 7
+        private const val PARAM_TOOL_CALLS = 8
+        private const val PARAM_TS = 9
     }
 
-    private val indexer = Indexer(db)
+    private val indexer = Indexer(db, embeddings)
     private val searcher = Searcher(db, embeddings)
     private val systemPromptAssembler = SystemPromptAssembler(workspaceFs)
     private val mutex = Mutex()
-
-    init {
-        observer?.event(ObserverEvent.MemoryDbReady(null, 0))
-    }
 
     override suspend fun appendMessage(
         conversationId: String,
@@ -57,10 +57,17 @@ class SqliteMemoryStore(
         mutex.withLock {
             withContext(Dispatchers.IO) {
                 db.dataSource.connection.use { conn ->
-                    conn.prepareStatement("INSERT INTO conversations(id) VALUES (?)").use { ps ->
-                        ps.setString(PARAM_CONV_ID, conversationId)
-                        ps.executeUpdate()
-                    }
+                    conn
+                        .prepareStatement(
+                            """
+                            INSERT OR IGNORE INTO conversations(id, channel, user_id, started_at)
+                            VALUES (?, 'cli', 'operator', ?)
+                            """.trimIndent(),
+                        ).use { ps ->
+                            ps.setString(PARAM_CONV_ID, conversationId)
+                            ps.setLong(PARAM_CHANNEL, msg.ts.toEpochMilliseconds())
+                            ps.executeUpdate()
+                        }
                     conn
                         .prepareStatement(
                             """
@@ -103,11 +110,11 @@ class SqliteMemoryStore(
                             while (rs.next()) {
                                 msgs.add(
                                     ConversationMessage(
-                                        id = UUID.fromString(rs.getString(PARAM_MSG_ID)),
-                                        role = ChatRole.valueOf(rs.getString(PARAM_ROLE)),
-                                        content = rs.getString(PARAM_CONTENT),
+                                        id = UUID.fromString(rs.getString(1)),
+                                        role = ChatRole.valueOf(rs.getString(2)),
+                                        content = rs.getString(3),
                                         toolCalls = emptyList(),
-                                        ts = Instant.fromEpochMilliseconds(rs.getLong(PARAM_TS)),
+                                        ts = Instant.fromEpochMilliseconds(rs.getLong(4)),
                                     ),
                                 )
                             }
@@ -148,7 +155,7 @@ class SqliteMemoryStore(
         return workspaceFs.list(wp).map { it.value }
     }
 
-    override suspend fun systemPrompt(): String = systemPromptAssembler.assemble()
+    override suspend fun systemPrompt(isGroup: Boolean): String = systemPromptAssembler.assemble(isGroup)
 
     override suspend fun snapshot(): MemorySnapshot =
         withContext(Dispatchers.IO) {
