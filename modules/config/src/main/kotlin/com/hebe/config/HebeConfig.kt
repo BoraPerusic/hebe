@@ -32,16 +32,8 @@ data class LlmSection(
 
 @Serializable
 data class AutonomySection(
-    val level: AutonomyLevel = AutonomyLevel.Supervised,
+    val level: com.hebe.api.AutonomyLevel = com.hebe.api.AutonomyLevel.Supervised,
 )
-
-@Serializable
-enum class AutonomyLevel {
-    ReadOnly,
-    Supervised,
-    Full,
-    YOLO,
-}
 
 @Serializable
 data class SecuritySection(

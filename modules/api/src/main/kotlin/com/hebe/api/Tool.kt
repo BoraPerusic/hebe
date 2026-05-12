@@ -10,6 +10,7 @@ interface Tool {
     val spec: ToolSpec
     val risk: RiskLevel
     val requiresApproval: Boolean get() = risk == RiskLevel.High
+    val readOnly: Boolean get() = false
 
     suspend fun invoke(
         args: JsonObject,
@@ -22,6 +23,7 @@ data class ToolSpec(
     val name: String,
     val description: String,
     val schema: JsonObject,
+    val pathScope: PathScope = PathScope.WorkspaceOnly,
 )
 
 interface ToolContext {
@@ -43,6 +45,14 @@ interface ApprovalGate {
         channel: String,
         threadExtId: String? = null,
     ): kotlinx.coroutines.flow.Flow<ApprovalStatus>
+
+    suspend fun awaitApproval(
+        tool: Tool,
+        args: JsonObject,
+        turnId: String,
+        channel: String,
+        threadExtId: String? = null,
+    ): Boolean
 
     fun resolve(
         approvalId: String,

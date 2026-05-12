@@ -1,23 +1,26 @@
 package com.hebe.tools.dispatch
 
+import com.hebe.api.ApprovalGate
 import com.hebe.api.ChatRole
 import com.hebe.api.ConversationMessage
+import com.hebe.api.LeakDetector
 import com.hebe.api.MemoryStore
 import com.hebe.api.Observer
 import com.hebe.api.ObserverEvent
+import com.hebe.api.PartialReceipt
 import com.hebe.api.ParsedToolCall
+import com.hebe.api.Receipts
 import com.hebe.api.Span
 import com.hebe.api.Tool
 import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
-import com.hebe.security.approval.ApprovalGate
 import java.util.UUID
 import kotlin.time.Clock
 import org.slf4j.LoggerFactory
 
 class ToolDispatcher(
     private val registry: ToolRegistry,
-    private val validators: List<Validator>,
+    private val validators: List<DispatchValidator>,
     private val approvalGate: ApprovalGate,
     private val memory: MemoryStore,
     private val observer: Observer,
@@ -52,12 +55,12 @@ class ToolDispatcher(
 
                 val validationResult = runValidators(call, tool, ctx)
                 when (validationResult) {
-                    is ValidationResult.Deny -> {
+                    is DispatchValidationResult.Deny -> {
                         val result = ToolResult.Err("policy: ${validationResult.reason}")
                         writeReceiptAndMemory(call, result, ctx, span, tool, startMs)
                         return DispatchOutcome.Result(result)
                     }
-                    is ValidationResult.RequireApproval -> {
+                    is DispatchValidationResult.RequireApproval -> {
                         val approved =
                             approvalGate.awaitApproval(
                                 tool = tool,
@@ -71,7 +74,7 @@ class ToolDispatcher(
                             return DispatchOutcome.Result(result)
                         }
                     }
-                    ValidationResult.Allow -> { /* continue */ }
+                    DispatchValidationResult.Allow -> { /* continue */ }
                 }
 
                 if (loopDetector.shouldForceText(ctx.turnId, call)) {
@@ -111,11 +114,11 @@ class ToolDispatcher(
         call: ParsedToolCall,
         tool: Tool,
         ctx: ToolContext,
-    ): ValidationResult {
-        var result: ValidationResult = ValidationResult.Allow
+    ): DispatchValidationResult {
+        var result: DispatchValidationResult = DispatchValidationResult.Allow
         for (validator in validators) {
             result = validator.validate(call, tool, ctx)
-            if (result !is ValidationResult.Allow) break
+            if (result !is DispatchValidationResult.Allow) break
         }
         return result
     }
@@ -166,22 +169,4 @@ class ToolDispatcher(
             is ToolResult.Err -> "ERROR: ${result.message}"
             is ToolResult.NeedsApproval -> "NEEDS_APPROVAL: ${result.prompt}"
         }
-}
-
-data class PartialReceipt(
-    val sessionId: String,
-    val turnId: String,
-    val tool: String,
-    val argsRedacted: String,
-    val risk: String,
-    val durationMs: Long,
-    val ok: Boolean,
-)
-
-interface LeakDetector {
-    fun scan(result: ToolResult): ToolResult
-}
-
-interface Receipts {
-    suspend fun append(partial: PartialReceipt): Long
 }

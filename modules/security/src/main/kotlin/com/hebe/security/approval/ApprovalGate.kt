@@ -64,12 +64,12 @@ class ApprovalGate(
             emit(decision)
         }
 
-    suspend fun awaitApproval(
+    override suspend fun awaitApproval(
         tool: Tool,
         args: JsonObject,
         turnId: String,
         channel: String,
-        threadExtId: String? = null,
+        threadExtId: String?,
     ): Boolean {
         val flow = requestIfNeeded(tool, args, turnId, channel, threadExtId)
         val status = flow.last()
