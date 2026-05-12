@@ -14,7 +14,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
-import java.nio.file.Path
+import java.util.Base64
 
 class FileSystemReadTool(
     private val fs: WorkspaceFs,
@@ -59,37 +59,46 @@ class FileSystemReadTool(
             ?: return ToolResult.Err("missing required argument: path")
         val encoding = args["encoding"]?.jsonPrimitive?.content ?: "utf-8"
 
-        val path = WorkspacePath(pathStr)
+        val path = try {
+            WorkspacePath(pathStr)
+        } catch (e: IllegalArgumentException) {
+            return ToolResult.Err("invalid path: ${e.message}")
+        }
         logger.debug("reading workspace path: {}", path.value)
 
-        return when (val content = fs.read(path)) {
-            null -> ToolResult.Err("file not found: ${path.value}")
-            else -> {
-                if (encoding == "base64") {
-                    val bytes = content.toByteArray()
-                    val base64 = java.util.Base64.getEncoder().encodeToString(bytes)
-                    return ToolResult.Ok(JsonPrimitive(base64))
-                }
-                val meta = MarkdownInferrer.metadata(path.value, content)
-                val isMarkdown = meta.extension == "md" || meta.extension == "markdown"
-                buildJsonObject {
-                    put("content", JsonPrimitive(content))
-                    if (isMarkdown) {
-                        put("title", JsonPrimitive(meta.title))
-                        put("headings", buildJsonArray { meta.headings.forEach { add(JsonPrimitive(it)) } })
-                        meta.frontmatter?.let { fm ->
-                            put(
-                                "frontmatter",
-                                buildJsonObject {
-                                    fm.forEach { (k, v) -> put(k, JsonPrimitive(v)) }
-                                },
-                            )
-                        }
-                    }
-                    put("extension", JsonPrimitive(meta.extension))
-                    put("size", JsonPrimitive(content.length))
-                }.let { ToolResult.Ok(it) }
-            }
+        // Read raw bytes so we can detect binary content reliably before any charset decoding
+        val bytes = fs.readBytes(path)
+            ?: return ToolResult.Err("file not found: ${path.value}")
+
+        if (encoding == "base64") {
+            return ToolResult.Ok(JsonPrimitive(Base64.getEncoder().encodeToString(bytes)))
         }
+
+        // Null bytes are the standard heuristic for binary content
+        val isBinary = bytes.any { it == 0.toByte() }
+        if (isBinary) {
+            return ToolResult.Err("binary file: use encoding=base64")
+        }
+
+        val content = String(bytes, Charsets.UTF_8)
+        val meta = MarkdownInferrer.metadata(path.value, content)
+        val isMarkdown = meta.extension == "md" || meta.extension == "markdown"
+        return buildJsonObject {
+            put("content", JsonPrimitive(content))
+            if (isMarkdown) {
+                put("title", JsonPrimitive(meta.title))
+                put("headings", buildJsonArray { meta.headings.forEach { add(JsonPrimitive(it)) } })
+                meta.frontmatter?.let { fm ->
+                    put(
+                        "frontmatter",
+                        buildJsonObject {
+                            fm.forEach { (k, v) -> put(k, JsonPrimitive(v)) }
+                        },
+                    )
+                }
+            }
+            put("extension", JsonPrimitive(meta.extension))
+            put("size", JsonPrimitive(bytes.size))
+        }.let { ToolResult.Ok(it) }
     }
 }

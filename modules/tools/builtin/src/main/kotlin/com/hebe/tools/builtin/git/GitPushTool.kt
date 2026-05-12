@@ -5,17 +5,16 @@ import com.hebe.api.Tool
 import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
 import com.hebe.api.ToolSpec
-import com.hebe.tools.builtin.shell.ProcessResult
-import com.hebe.tools.builtin.shell.ProcessRunner
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.RepositoryBuilder
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 
 class GitPushTool(
     private val workspaceRoot: Path,
@@ -68,7 +67,13 @@ class GitPushTool(
 
         val cwd = if (dirStr != null) {
             val absPath = workspaceRoot.resolve(dirStr)
-            if (!absPath.toString().startsWith(workspaceRoot.toString())) {
+            val normalized = absPath.normalize()
+            val rootRealPath = try {
+                workspaceRoot.toRealPath()
+            } catch (_: Exception) {
+                workspaceRoot.toAbsolutePath()
+            }
+            if (!normalized.startsWith(rootRealPath)) {
                 return ToolResult.Err("dir outside workspace: $dirStr")
             }
             absPath
@@ -83,18 +88,39 @@ class GitPushTool(
             return ToolResult.Err("not a git repo: $cwd")
         }
 
-        val branchArg = if (branch != null) "$remote $branch" else remote
-        val result = ProcessRunner.run("git push $branchArg", cwd, 120_000)
+        // Build args list — no shell interpolation, so any remote/branch value is safe
+        val cmdArgs = mutableListOf("git", "push", remote)
+        if (branch != null) cmdArgs.add(branch)
 
-        return if (result.exitCode == 0) {
-            ToolResult.Ok(
-                buildJsonObject {
-                    put("stdout", JsonPrimitive(result.stdout))
-                    put("stderr", JsonPrimitive(result.stderr))
-                },
-            )
-        } else {
-            ToolResult.Err("push failed: ${result.stderr.take(500)}")
+        return withContext(Dispatchers.IO) {
+            try {
+                val process = ProcessBuilder(cmdArgs)
+                    .directory(cwd.toFile())
+                    .start()
+
+                val completed = process.waitFor(120, TimeUnit.SECONDS)
+                if (!completed) {
+                    process.destroy()
+                    try { Thread.sleep(1_000) } catch (_: Exception) { }
+                    if (process.isAlive) process.destroyForcibly()
+                    return@withContext ToolResult.Err("push timed out after 120s")
+                }
+
+                val stdout = process.inputStream.bufferedReader().readText()
+                val stderr = process.errorStream.bufferedReader().readText()
+                val exitCode = process.exitValue()
+
+                if (exitCode == 0) {
+                    ToolResult.Ok(buildJsonObject {
+                        put("stdout", JsonPrimitive(stdout))
+                        put("stderr", JsonPrimitive(stderr))
+                    })
+                } else {
+                    ToolResult.Err("push failed: ${stderr.take(500)}")
+                }
+            } catch (e: Exception) {
+                ToolResult.Err("push error: ${e.message}")
+            }
         }
     }
 }

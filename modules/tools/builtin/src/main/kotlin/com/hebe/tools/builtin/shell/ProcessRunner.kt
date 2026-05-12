@@ -1,6 +1,8 @@
 package com.hebe.tools.builtin.shell
 
 import com.hebe.security.estop.EmergencyStop
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 
@@ -26,7 +28,7 @@ object ProcessRunner {
         timeoutMs: Long = DEFAULT_TIMEOUT_MS,
         env: Map<String, String> = emptyMap(),
         emergencyStop: EmergencyStop? = null,
-    ): ProcessResult {
+    ): ProcessResult = withContext(Dispatchers.IO) {
         val effectiveTimeout = timeoutMs.coerceIn(0L, MAX_TIMEOUT_MS)
         logger.debug("running shell command: {} (timeout={}ms)", cmd, effectiveTimeout)
 
@@ -49,6 +51,8 @@ object ProcessRunner {
         var exitCode = -1
         var timedOut = false
 
+        // Polling inside Dispatchers.IO: Thread.sleep is fine on an IO thread.
+        // Polling every 100ms keeps EmergencyStop responsiveness without busy-spin.
         while (process.isAlive) {
             val elapsedMs = (System.nanoTime() - startNs) / 1_000_000
             if (elapsedMs >= effectiveTimeout) {
@@ -80,7 +84,7 @@ object ProcessRunner {
         stdoutThread.join(1000)
         stderrThread.join(1000)
 
-        return if (timedOut) {
+        if (timedOut) {
             ProcessResult("", "timeout after ${effectiveTimeout}ms", -1, timedOut = true)
         } else {
             ProcessResult(

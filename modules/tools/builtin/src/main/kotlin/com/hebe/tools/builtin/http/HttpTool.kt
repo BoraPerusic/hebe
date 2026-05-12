@@ -6,21 +6,16 @@ import com.hebe.api.Tool
 import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
 import com.hebe.api.ToolSpec
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.HttpTimeout
-import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import com.hebe.tools.builtin.builtinHttpClient
+import io.ktor.client.request.delete
 import io.ktor.client.request.get
+import io.ktor.client.request.patch
 import io.ktor.client.request.post
 import io.ktor.client.request.put
-import io.ktor.client.request.delete
-import io.ktor.client.request.patch
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
+import io.ktor.http.Headers
 import io.ktor.http.contentType
-import io.ktor.serialization.kotlinx.json.json
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -33,15 +28,7 @@ class HttpTool(
 ) : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    private val client = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json(Json { ignoreUnknownKeys = true })
-        }
-        install(HttpTimeout) {
-            requestTimeoutMillis = 60_000
-            connectTimeoutMillis = 10_000
-        }
-    }
+    private val client = builtinHttpClient
 
     override val spec = ToolSpec(
         name = "http",
@@ -129,50 +116,55 @@ class HttpTool(
         }
 
         return try {
-            val httpResponse: Pair<Int, String>
+            val httpResponse: Triple<Int, String, Headers>
             when (methodStr) {
                 "GET" -> {
                     val resp = client.get(url) {
                         applyHeaders(finalHeaders)
                     }
-                    httpResponse = resp.status.value to resp.bodyAsText()
+                    httpResponse = Triple(resp.status.value, resp.bodyAsText(), resp.headers)
                 }
                 "POST" -> {
                     val resp = client.post(url) {
                         applyHeaders(finalHeaders)
                         requestBody?.let { setBody(it) }
                     }
-                    httpResponse = resp.status.value to resp.bodyAsText()
+                    httpResponse = Triple(resp.status.value, resp.bodyAsText(), resp.headers)
                 }
                 "PUT" -> {
                     val resp = client.put(url) {
                         applyHeaders(finalHeaders)
                         requestBody?.let { setBody(it) }
                     }
-                    httpResponse = resp.status.value to resp.bodyAsText()
+                    httpResponse = Triple(resp.status.value, resp.bodyAsText(), resp.headers)
                 }
                 "DELETE" -> {
                     val resp = client.delete(url) {
                         applyHeaders(finalHeaders)
                     }
-                    httpResponse = resp.status.value to resp.bodyAsText()
+                    httpResponse = Triple(resp.status.value, resp.bodyAsText(), resp.headers)
                 }
                 "PATCH" -> {
                     val resp = client.patch(url) {
                         applyHeaders(finalHeaders)
                         requestBody?.let { setBody(it) }
                     }
-                    httpResponse = resp.status.value to resp.bodyAsText()
+                    httpResponse = Triple(resp.status.value, resp.bodyAsText(), resp.headers)
                 }
                 else -> return ToolResult.Err("unsupported HTTP method: $methodStr")
             }
 
             val truncated = truncate(httpResponse.second, 1_000_000)
+            val responseHeaders = buildJsonObject {
+                httpResponse.third.forEach { name, values ->
+                    put(name, JsonPrimitive(values.joinToString(",")))
+                }
+            }
             ToolResult.Ok(
                 buildJsonObject {
                     put("status", JsonPrimitive(httpResponse.first))
                     put("body", JsonPrimitive(truncated))
-                    put("headers", buildJsonObject { })
+                    put("headers", responseHeaders)
                 },
             )
         } catch (e: Exception) {

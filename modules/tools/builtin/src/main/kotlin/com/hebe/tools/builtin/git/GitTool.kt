@@ -53,18 +53,12 @@ class GitTool(
         pathScope = com.hebe.api.PathScope.ConfiguredRoots,
     )
 
-    override val risk: RiskLevel
-        get() = when (verbFromArgs(emptyArgs())) {
-            "clone" -> RiskLevel.High
-            "status", "diff", "log", "branch" -> RiskLevel.Low
-            "commit", "branch_create" -> RiskLevel.Medium
-            else -> RiskLevel.High
-        }
+    override val risk = RiskLevel.Medium
 
-    override val readOnly: Boolean
-        get() = verbFromArgs(emptyArgs()) in listOf("status", "diff", "log", "branch")
+    override val readOnly: Boolean = false
 
-    private var emptyArgs = { JsonObject(emptyMap()) }
+    override fun effectiveRequiresApproval(args: JsonObject): Boolean =
+        args["verb"]?.jsonPrimitive?.content?.lowercase() == "clone"
 
     override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
         val verb = args["verb"]?.jsonPrimitive?.content
@@ -193,10 +187,15 @@ class GitTool(
         val dir = resolveRepoDir(args) ?: return ToolResult.Err("dir is required for commit")
         val message = args["message"]?.jsonPrimitive?.content
             ?: return ToolResult.Err("missing required argument: message")
+        val pathsArg = args["paths"]?.jsonPrimitive?.content
 
         return try {
             val git = Git.open(dir)
-            git.add().addFilepattern(".").call()
+            if (pathsArg != null) {
+                git.add().addFilepattern(pathsArg).call()
+            } else {
+                git.add().addFilepattern(".").call()
+            }
             val commit = git.commit().setMessage(message).call()
             ToolResult.Ok(JsonPrimitive("committed: ${commit.id.abbreviate(7).name()}"))
         } catch (e: Exception) {
@@ -207,7 +206,13 @@ class GitTool(
     private fun resolveRepoDir(args: JsonObject): File? {
         val dirStr = args["dir"]?.jsonPrimitive?.content ?: return workspaceRoot.toFile()
         val absPath = workspaceRoot.resolve(dirStr)
-        if (!absPath.toString().startsWith(workspaceRoot.toString())) {
+        val normalized = absPath.normalize()
+        val rootRealPath = try {
+            workspaceRoot.toRealPath()
+        } catch (_: Exception) {
+            workspaceRoot.toAbsolutePath()
+        }
+        if (!normalized.startsWith(rootRealPath)) {
             return null
         }
         return absPath.toFile()

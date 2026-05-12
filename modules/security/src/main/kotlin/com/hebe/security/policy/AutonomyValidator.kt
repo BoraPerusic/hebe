@@ -34,11 +34,11 @@ class AutonomyValidator(
             AutonomyLevel.Full -> {
                 when (tool.risk) {
                     RiskLevel.Low -> ValidationResult.Allow
-                    RiskLevel.Medium -> ValidationResult.Allow
+                    RiskLevel.Medium,
                     RiskLevel.High -> {
-                        if (tool.requiresApproval) {
+                        if (tool.effectiveRequiresApproval(call.args)) {
                             ValidationResult.RequireApproval(
-                                "High-risk tool ${tool.spec.name} requires approval regardless of autonomy level",
+                                "${tool.risk.name}-risk tool ${tool.spec.name} requires approval",
                             )
                         } else {
                             ValidationResult.Allow

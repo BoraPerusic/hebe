@@ -61,4 +61,20 @@ class FileSystemReadToolTest {
         Assertions.assertTrue(result is ToolResult.Err)
         Assertions.assertTrue((result as ToolResult.Err).message.contains("missing required argument"))
     }
+
+    @Test
+    fun `read path with traversal attack returns Err`(@TempDir tempDir: Path) {
+        val fs = WorkspaceFs(tempDir)
+        fs.write(WorkspacePath("test.txt"), "secret data")
+        val tool = FileSystemReadTool(fs)
+
+        val args = buildJsonObject {
+            put("path", kotlinx.serialization.json.JsonPrimitive("../../etc/passwd"))
+        }
+        val ctx = mockk<ToolContext>()
+
+        val result = runBlocking { tool.invoke(args, ctx) }
+
+        Assertions.assertTrue(result is ToolResult.Err)
+    }
 }

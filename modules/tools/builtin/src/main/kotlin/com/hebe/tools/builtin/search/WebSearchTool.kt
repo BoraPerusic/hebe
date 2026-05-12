@@ -16,11 +16,9 @@ import org.slf4j.LoggerFactory
 
 class WebSearchTool(
     private val secretLookup: SecretLookup,
-    private val braveApiKey: String? = null,
 ) : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    private val braveProvider: WebSearchProvider? = braveApiKey?.let { BraveSearchProvider(it) }
     private val ddgProvider = DuckDuckGoSearchProvider()
 
     override val spec = ToolSpec(
@@ -63,8 +61,9 @@ class WebSearchTool(
 
         logger.debug("web_search query={} k={}", query, k)
 
-        val provider = if (braveProvider != null) {
-            braveProvider
+        val braveApiKey = ctx.secretLookup.secret("brave_api_key")
+        val provider = if (braveApiKey != null) {
+            BraveSearchProvider(braveApiKey)
         } else {
             logger.debug("no brave API key, using duckduckgo fallback")
             ddgProvider

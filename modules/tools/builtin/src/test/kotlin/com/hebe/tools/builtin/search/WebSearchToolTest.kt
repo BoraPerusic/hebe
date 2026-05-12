@@ -1,40 +1,58 @@
 package com.hebe.tools.builtin.search
 
+import com.hebe.api.SecretLookup
 import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
+import io.mockk.every
 import io.mockk.mockk
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import org.junit.jupiter.api.Assertions
-import org.junit.jupiter.api.Test
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 
 class WebSearchToolTest {
     @Test
-    fun `web_search missing query returns Err`() {
-        val tool = WebSearchTool(mockk(), null)
-
-        val args = buildJsonObject { }
+    fun `missing query returns Err`() {
+        val tool = WebSearchTool(mockk<SecretLookup>())
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking { tool.invoke(args, ctx) }
+        val result = runBlocking { tool.invoke(buildJsonObject {}, ctx) }
 
-        Assertions.assertTrue(result is ToolResult.Err)
-        Assertions.assertTrue((result as ToolResult.Err).message.contains("missing required argument"))
+        assertTrue(result is ToolResult.Err)
+        assertTrue((result as ToolResult.Err).message.contains("missing required argument"))
     }
 
     @Test
-    fun `web_search empty results returns empty array`() {
-        val tool = WebSearchTool(mockk(), "fake-key")
-
-        val args = buildJsonObject {
-            put("query", kotlinx.serialization.json.JsonPrimitive("test"))
-            put("k", kotlinx.serialization.json.JsonPrimitive(5))
-        }
+    fun `with no brave key uses DuckDuckGo fallback and returns Ok`() {
+        val secretLookup = mockk<SecretLookup>()
+        every { secretLookup.secret(any()) } returns null
+        val tool = WebSearchTool(secretLookup)
         val ctx = mockk<ToolContext>()
+        every { ctx.secretLookup } returns secretLookup
 
-        val result = runBlocking { tool.invoke(args, ctx) }
+        // DuckDuckGo may fail in test environment but the provider catches and returns empty list
+        val result = runBlocking {
+            tool.invoke(buildJsonObject { put("query", JsonPrimitive("test query")) }, ctx)
+        }
 
-        Assertions.assertTrue(result is ToolResult.Ok)
+        // Either Ok (empty hits when network unavailable) or Ok (with hits when network available)
+        assertTrue(result is ToolResult.Ok)
+    }
+
+    @Test
+    fun `with brave key set attempts Brave provider and returns Ok`() {
+        val secretLookup = mockk<SecretLookup>()
+        every { secretLookup.secret("brave_api_key") } returns "fake-key-for-test"
+        val tool = WebSearchTool(secretLookup)
+        val ctx = mockk<ToolContext>()
+        every { ctx.secretLookup } returns secretLookup
+
+        // Brave will fail with a fake key but BraveSearchProvider catches and returns empty list
+        val result = runBlocking {
+            tool.invoke(buildJsonObject { put("query", JsonPrimitive("test query")) }, ctx)
+        }
+
+        assertTrue(result is ToolResult.Ok)
     }
 }

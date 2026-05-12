@@ -5,8 +5,8 @@ import com.hebe.api.Tool
 import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
 import com.hebe.api.ToolSpec
+import com.hebe.api.workspace.WorkspacePath
 import com.hebe.memory.workspace.WorkspaceFs
-import com.hebe.memory.workspace.WorkspacePath
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -19,7 +19,9 @@ class WikiReadTool(
 ) : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    private val WIKI_PREFIX = "wiki/"
+    companion object {
+        private const val WIKI_PREFIX = "wiki/"
+    }
 
     override val spec = ToolSpec(
         name = "wiki_read",

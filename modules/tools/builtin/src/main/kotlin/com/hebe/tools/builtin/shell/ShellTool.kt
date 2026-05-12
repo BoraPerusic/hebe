@@ -72,7 +72,13 @@ class ShellTool(
         val cwd = if (cwdStr != null) {
             val wp = WorkspacePath(cwdStr)
             val absPath = workspaceRoot.resolve(wp.value)
-            if (!absPath.toString().startsWith(workspaceRoot.toString())) {
+            val normalized = absPath.normalize()
+            val rootRealPath = try {
+                workspaceRoot.toRealPath()
+            } catch (_: Exception) {
+                workspaceRoot.toAbsolutePath()
+            }
+            if (!normalized.startsWith(rootRealPath)) {
                 return ToolResult.Err("cwd outside workspace: $cwdStr")
             }
             absPath

@@ -61,6 +61,7 @@ class JobCreateTool : Tool {
         val id = "job-${System.currentTimeMillis()}"
         logger.debug("job_create kind={} id={}", kind, id)
 
+        // stub: pending M8.T2 for DB persistence
         return ToolResult.Ok(buildJsonObject {
             put("id", JsonPrimitive(id))
             put("kind", JsonPrimitive(kind))
@@ -100,6 +101,7 @@ class JobStatusTool : Tool {
 
         logger.debug("job_status id={}", id)
 
+        // stub: pending M8.T2 for DB persistence
         return ToolResult.Ok(buildJsonObject {
             put("id", JsonPrimitive(id))
             put("status", JsonPrimitive("pending"))

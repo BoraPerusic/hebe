@@ -13,6 +13,8 @@ class WorkspaceFs(
         require(Files.isDirectory(root)) { "Workspace root must exist: $root" }
     }
 
+    val workspaceRoot: Path get() = root
+
     fun read(path: WorkspacePath): String? {
         val resolved = resolveForRead(path) ?: return null
         return if (Files.exists(resolved) && Files.isRegularFile(resolved)) {
@@ -88,6 +90,29 @@ class WorkspaceFs(
         } catch (e: IOException) {
             logger.warn("Failed to delete workspace path: ${path.value}", e)
             false
+        }
+    }
+
+    data class FileMetadata(
+        val size: Long,
+        val modifiedMs: Long,
+    )
+
+    fun readBytes(path: WorkspacePath): ByteArray? {
+        val resolved = resolveForRead(path) ?: return null
+        if (!Files.exists(resolved) || !Files.isRegularFile(resolved)) return null
+        return Files.readAllBytes(resolved)
+    }
+
+    fun stat(path: WorkspacePath): FileMetadata? {
+        val resolved = resolveForRead(path) ?: return null
+        return try {
+            FileMetadata(
+                size = Files.size(resolved),
+                modifiedMs = Files.getLastModifiedTime(resolved).toMillis(),
+            )
+        } catch (_: Exception) {
+            null
         }
     }
 

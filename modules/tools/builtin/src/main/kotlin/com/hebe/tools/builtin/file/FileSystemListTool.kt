@@ -13,12 +13,9 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
-import java.nio.file.Files
-import java.nio.file.Path
 
 class FileSystemListTool(
     private val fs: WorkspaceFs,
-    private val workspaceRoot: Path,
 ) : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -54,13 +51,11 @@ class FileSystemListTool(
 
         val files = fs.list(prefix)
         val items = files.map { wp ->
-            val absPath = workspaceRoot.resolve(wp.value)
-            val size = if (Files.exists(absPath)) Files.size(absPath) else 0L
-            val modified = if (Files.exists(absPath)) Files.getLastModifiedTime(absPath).toMillis() else 0L
+            val metadata = fs.stat(wp) ?: WorkspaceFs.FileMetadata(0L, 0L)
             buildJsonObject {
                 put("name", JsonPrimitive(wp.value))
-                put("size", JsonPrimitive(size))
-                put("modified", JsonPrimitive(modified))
+                put("size", JsonPrimitive(metadata.size))
+                put("modified", JsonPrimitive(metadata.modifiedMs))
             }
         }
         return ToolResult.Ok(buildJsonArray { items.forEach { add(it) } })

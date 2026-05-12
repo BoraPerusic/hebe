@@ -63,7 +63,10 @@
       "Bash(./gradlew :modules:core:test --tests \"com.hebe.core.delegate.ChatDelegateTest.run stops at max iterations\" --info)",
       "Bash(./gradlew :modules:providers:openai-compat:test --tests \"com.hebe.providers.openai.SseParserTest.tool call accumulated across fragments and emitted when complete\" --info)",
       "Bash(xargs -I{} sh -c 'echo \"=== {} ===\"; cat \"{}\"')",
-      "Bash(./gradlew :modules:security:compileKotlin :modules:cli-app:compileKotlin)"
+      "Bash(./gradlew :modules:security:compileKotlin :modules:cli-app:compileKotlin)",
+      "Bash(./gradlew :modules:tools:builtin:compileTestKotlin)",
+      "Bash(./gradlew :modules:tools:builtin:test)",
+      "Bash(./gradlew :modules:tools:builtin:test --rerun)"
     ]
   }
 }

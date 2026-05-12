@@ -12,6 +12,13 @@ interface Tool {
     val requiresApproval: Boolean get() = risk == RiskLevel.High
     val readOnly: Boolean get() = false
 
+    /**
+     * Per-invocation approval gate. Override in multi-verb tools where some verbs need
+     * approval and others don't. The dispatcher calls this instead of [requiresApproval]
+     * at Full autonomy level so the actual args are available.
+     */
+    fun effectiveRequiresApproval(args: JsonObject): Boolean = requiresApproval
+
     suspend fun invoke(
         args: JsonObject,
         ctx: ToolContext,

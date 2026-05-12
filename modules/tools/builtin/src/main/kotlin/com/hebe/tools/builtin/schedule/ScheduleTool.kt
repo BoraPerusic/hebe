@@ -76,6 +76,7 @@ class ScheduleTool : Tool {
             return ToolResult.Err("invalid cron expression: $cron")
         }
 
+        // stub: pending M8.T1 for DB persistence
         return ToolResult.Ok(
             buildJsonObject {
                 put("id", JsonPrimitive("routine-$name"))
@@ -88,6 +89,7 @@ class ScheduleTool : Tool {
     }
 
     private fun listRoutines(): ToolResult {
+        // stub: pending M8.T1 for DB persistence
         return ToolResult.Ok(JsonArray(emptyList()))
     }
 

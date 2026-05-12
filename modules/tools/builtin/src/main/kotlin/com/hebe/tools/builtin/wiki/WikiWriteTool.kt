@@ -23,7 +23,9 @@ class WikiWriteTool(
 ) : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    private val WIKI_PREFIX = "wiki/"
+    companion object {
+        private const val WIKI_PREFIX = "wiki/"
+    }
 
     override val spec = ToolSpec(
         name = "wiki_write",

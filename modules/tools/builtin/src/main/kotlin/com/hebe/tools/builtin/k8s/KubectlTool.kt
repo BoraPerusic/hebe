@@ -5,26 +5,19 @@ import com.hebe.api.Tool
 import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
 import com.hebe.api.ToolSpec
-import com.hebe.tools.builtin.shell.ProcessRunner
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 
 class KubectlTool(
     private val workspaceRoot: Path,
 ) : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
-
-    private val READ_ONLY_VERBS = setOf(
-        "get", "describe", "logs", "top", "events", "version",
-        "config", "view", "auth", "can-i", "explain", "get",
-    )
 
     private val MUTATING_VERBS = setOf(
         "apply", "create", "delete", "patch", "replace",
@@ -39,6 +32,7 @@ class KubectlTool(
             "Mutating verbs are High risk and always require approval.",
         schema = buildJsonObject {
             put("type", JsonPrimitive("object"))
+            put("required", buildJsonArray { add(JsonPrimitive("verb")) })
             put(
                 "properties",
                 buildJsonObject {
@@ -76,47 +70,79 @@ class KubectlTool(
         pathScope = com.hebe.api.PathScope.WorkspaceOnly,
     )
 
-    override val risk: RiskLevel
-        get() = RiskLevel.Medium
+    override val risk = RiskLevel.Medium
 
-    override val readOnly: Boolean
-        get() = false
+    override val readOnly: Boolean = false
+
+    override fun effectiveRequiresApproval(args: JsonObject): Boolean {
+        val verb = args["verb"]?.jsonPrimitive?.content ?: return true
+        return verb in MUTATING_VERBS
+    }
 
     override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
         val verb = args["verb"]?.jsonPrimitive?.content
             ?: return ToolResult.Err("missing required argument: verb")
-        val extraArgsArr = args["args"]?.jsonArray
+        val extraArgsArr = args["args"]?.let { arg ->
+            if (arg is kotlinx.serialization.json.JsonArray) {
+                arg.mapNotNull { it.jsonPrimitive?.content }
+            } else null
+        } ?: emptyList()
         val kubeconfig = args["kubeconfig"]?.jsonPrimitive?.content
         val context = args["context"]?.jsonPrimitive?.content
 
         logger.debug("kubectl verb={}", verb)
 
-        val extraArgs = extraArgsArr?.mapNotNull { it.jsonPrimitive?.content } ?: emptyList()
-        val kubectlArgs = buildKubectlArgs(verb, extraArgs, kubeconfig, context)
+        val cmdArgs = buildKubectlArgsList(verb, extraArgsArr, kubeconfig, context)
 
-        val result = ProcessRunner.run("kubectl $kubectlArgs", workspaceRoot, 120_000)
+        return runKubectl(cmdArgs)
+    }
 
-        return if (result.timedOut) {
-            ToolResult.Err("timeout after 120s")
-        } else if (result.exitCode == 0) {
-            ToolResult.Ok(
-                buildJsonObject {
-                    put("stdout", JsonPrimitive(result.stdout))
-                    put("stderr", JsonPrimitive(result.stderr))
-                    put("exitCode", JsonPrimitive(result.exitCode))
-                },
-            )
-        } else {
-            ToolResult.Err("kubectl failed: ${result.stderr.take(500)}")
+    private fun runKubectl(cmdArgs: List<String>): ToolResult {
+        return try {
+            val processBuilder = ProcessBuilder(cmdArgs)
+            processBuilder.directory(workspaceRoot.toFile())
+            val process = processBuilder.start()
+
+            val completed = process.waitFor(120, TimeUnit.SECONDS)
+            if (!completed) {
+                process.destroy()
+                try { Thread.sleep(1000) } catch (_: Exception) { }
+                if (process.isAlive) process.destroyForcibly()
+                return ToolResult.Err("timeout after 120s")
+            }
+
+            val stdout = process.inputStream.bufferedReader().readText()
+            val stderr = process.errorStream.bufferedReader().readText()
+            val exitCode = process.exitValue()
+
+            if (exitCode == 0) {
+                ToolResult.Ok(
+                    buildJsonObject {
+                        put("stdout", JsonPrimitive(stdout))
+                        put("stderr", JsonPrimitive(stderr))
+                        put("exitCode", JsonPrimitive(exitCode))
+                    },
+                )
+            } else {
+                ToolResult.Err("kubectl failed: ${stderr.take(500)}")
+            }
+        } catch (e: Exception) {
+            ToolResult.Err("kubectl error: ${e.message}")
         }
     }
 
-    private fun buildKubectlArgs(verb: String, extraArgs: List<String>, kubeconfig: String?, context: String?): String {
+    private fun buildKubectlArgsList(
+        verb: String,
+        extraArgs: List<String>,
+        kubeconfig: String?,
+        context: String?,
+    ): List<String> {
         val parts = mutableListOf<String>()
-        kubeconfig?.let { parts.add("--kubeconfig=$it") }
-        context?.let { parts.add("--context=$it") }
+        parts.add("kubectl")
+        kubeconfig?.let { parts.addAll(listOf("--kubeconfig", it)) }
+        context?.let { parts.addAll(listOf("--context", it)) }
         parts.add(verb)
         parts.addAll(extraArgs)
-        return parts.joinToString(" ")
+        return parts
     }
 }

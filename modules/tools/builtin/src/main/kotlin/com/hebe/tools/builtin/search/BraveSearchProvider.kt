@@ -1,8 +1,6 @@
 package com.hebe.tools.builtin.search
 
-import io.ktor.client.HttpClient
-import io.ktor.client.engine.cio.CIO
-import io.ktor.client.plugins.HttpTimeout
+import com.hebe.tools.builtin.builtinHttpClient
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
@@ -18,12 +16,7 @@ class BraveSearchProvider(
 ) : WebSearchProvider {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    private val client = HttpClient(CIO) {
-        install(HttpTimeout) {
-            requestTimeoutMillis = 30_000
-            connectTimeoutMillis = 10_000
-        }
-    }
+    private val client = builtinHttpClient
 
     override val name = "brave"
 
