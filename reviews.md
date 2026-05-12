@@ -2,4 +2,4 @@ Review the code generated; especially against the task list. Look for architectu
 
 The work is done according to a plan, so always check what the plan was and if there are any (undocumented) deviations. The plan is split by stages in the `docs/plan/tasks` folder, see file `README.md` there and the Mn-*.md files with task list for each stage. Point out the deviations to the task list.
 
-Write the findings to the file "review-xxx.md" (xxx being the sequential numbering) in the project root as a clear task list with checkboxes that we can follow the progress of implementation later on in.
+Write the findings to the file "review-xxx.md" (xxx being the sequential numbering) in the project root, and prepare a clear task list `tasks-review-xxx.md` with checkboxes that the developer can follow.

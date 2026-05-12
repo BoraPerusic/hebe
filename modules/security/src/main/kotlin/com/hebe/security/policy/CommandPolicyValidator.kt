@@ -5,8 +5,6 @@ import com.hebe.api.Tool
 import com.hebe.api.ToolContext
 import com.hebe.api.ValidationResult
 import com.hebe.api.Validator
-import com.hebe.tools.dispatch.DispatchValidator
-import com.hebe.tools.dispatch.DispatchValidationResult
 
 class CommandPolicyValidator(
     private val allowedCommandGlobs: List<String>,
@@ -84,110 +82,7 @@ class CommandPolicyValidator(
                         sb.append(".*")
                         i += 2
                     } else {
-                        sb.append("[^ ]*")
-                        i++
-                    }
-                }
-                '?' -> {
-                    sb.append(".")
-                    i++
-                }
-                '.' -> {
-                    sb.append("\\.")
-                    i++
-                }
-                else -> {
-                    if (c in "\\+()[]{}^$|.{|}") {
-                        sb.append("\\").append(c)
-                    } else {
-                        sb.append(c)
-                    }
-                    i++
-                }
-            }
-        }
-        sb.append("$")
-        return Regex(sb.toString())
-    }
-}
-
-class CommandPolicyDispatchValidator(
-    private val allowedCommandGlobs: List<String>,
-    private val forbiddenCommandGlobs: List<String>,
-) : DispatchValidator {
-    private val patternChecker = CommandPatternChecker()
-
-    override suspend fun validate(
-        call: ParsedToolCall,
-        tool: Tool,
-        ctx: ToolContext,
-    ): DispatchValidationResult {
-        val cmd = extractCmd(call.args) ?: return DispatchValidationResult.Allow
-
-        val normalized = normalizeGlobPatterns(allowedCommandGlobs)
-        val forbiddenNormalized = normalizeGlobPatterns(forbiddenCommandGlobs)
-
-        for (forbidden in forbiddenNormalized) {
-            if (matchesGlob(cmd, forbidden)) {
-                return DispatchValidationResult.Deny("Command matches forbidden glob pattern: $forbidden")
-            }
-        }
-
-        for (allowed in normalized) {
-            if (matchesGlob(cmd, allowed)) {
-                val patternResult = patternChecker.check(cmd)
-                return when {
-                    patternResult.severity == CommandPatternChecker.Severity.High -> {
-                        DispatchValidationResult.RequireApproval(
-                            "Command passed allowlist but pattern checker flagged: ${patternResult.reason}",
-                        )
-                    }
-                    else -> DispatchValidationResult.Allow
-                }
-            }
-        }
-
-        return DispatchValidationResult.Deny("Command not in allowlist")
-    }
-
-    private fun extractCmd(args: kotlinx.serialization.json.JsonObject): String? {
-        val cmdElement = args["cmd"] ?: args["command"] ?: args["script"]
-        return if (cmdElement is kotlinx.serialization.json.JsonPrimitive && cmdElement.isString) {
-            cmdElement.content
-        } else {
-            null
-        }
-    }
-
-    private fun normalizeGlobPatterns(patterns: List<String>): List<String> {
-        return patterns.map { it.trim() }
-    }
-
-    private fun matchesGlob(cmd: String, glob: String): Boolean {
-        val trimmedGlob = glob.trim()
-        val trimmedCmd = cmd.trim()
-
-        if (trimmedGlob == "*") return true
-
-        if (!trimmedGlob.contains("*")) {
-            return trimmedCmd.startsWith(trimmedGlob)
-        }
-
-        val regex = globToRegex(trimmedGlob)
-        return regex.containsMatchIn(trimmedCmd)
-    }
-
-    private fun globToRegex(glob: String): Regex {
-        val sb = StringBuilder("^")
-        var i = 0
-        while (i < glob.length) {
-            when (val c = glob[i]) {
-                '*' -> {
-                    if (i + 1 < glob.length && glob[i + 1] == '*') {
                         sb.append(".*")
-                        i += 2
-                    } else {
-                        sb.append("[^ ]*")
                         i++
                     }
                 }

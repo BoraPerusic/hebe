@@ -6,6 +6,7 @@ class CommandPatternChecker {
         PipeToShellChecker,
         NetworkExfilChecker,
         VariableSubstitutionChecker,
+        RmRfChecker,
     )
 
     fun check(cmd: String): PatternCheckResult {
@@ -32,7 +33,7 @@ class CommandPatternChecker {
     object CommandSubstitutionChecker : DangerousChecker {
         private val backtickPattern = Regex("`[^`]+`")
         private val dollarParenPattern = Regex("\\$\\([^)]+\\)")
-        private val harmfulKeywords = listOf("rm -rf", "curl", "wget", "sh", "bash")
+        private val harmfulKeywords = listOf("curl", "wget", "sh", "bash")
 
         override fun matches(cmd: String): Pair<Severity, String>? {
             val containsBacktick = backtickPattern.containsMatchIn(cmd)
@@ -48,7 +49,7 @@ class CommandPatternChecker {
     }
 
     object PipeToShellChecker : DangerousChecker {
-        private val pipeToShellPattern = Regex("\\|\\s*(bash|sh|python|york|perl|rb|lua|php|node)")
+        private val pipeToShellPattern = Regex("\\|\\s*(bash|sh|python|ruby|perl|lua|php|node)")
 
         override fun matches(cmd: String): Pair<Severity, String>? {
             return if (pipeToShellPattern.containsMatchIn(cmd)) {
@@ -79,8 +80,22 @@ class CommandPatternChecker {
         private val dollarNine = String(charArrayOf('$', '9'))
 
         override fun matches(cmd: String): Pair<Severity, String>? {
-            return if (ifsPattern.containsMatchIn(cmd) && cmd.contains(dollarNine)) {
-                Pair(Severity.Medium, "Variable substitution tricks detected")
+            if (ifsPattern.containsMatchIn(cmd) && cmd.contains(dollarNine)) {
+                return Pair(Severity.Medium, "Variable substitution tricks detected")
+            }
+            if (ifsPattern.containsMatchIn(cmd)) {
+                return Pair(Severity.Medium, "Variable substitution tricks detected")
+            }
+            return null
+        }
+    }
+
+    object RmRfChecker : DangerousChecker {
+        private val rmRfPattern = Regex("rm\\s+(-[rf]+\\s+)*(/|\\*)")
+
+        override fun matches(cmd: String): Pair<Severity, String>? {
+            return if (rmRfPattern.containsMatchIn(cmd)) {
+                Pair(Severity.High, "Dangerous rm -rf pattern detected")
             } else {
                 null
             }

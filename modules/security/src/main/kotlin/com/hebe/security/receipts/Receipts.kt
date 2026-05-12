@@ -7,9 +7,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.serializer
+import java.nio.channels.FileChannel
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
 
 class Receipts(
@@ -21,6 +25,8 @@ class Receipts(
     private var currentSeq: Long = 0
     private var fsyncCounter = 0
     private val fsyncBatchSize = 16
+    private var currentChannel: java.nio.channels.FileChannel? = null
+    private var currentMonth: String = ""
 
     companion object {
         private val ZERO_HASH = "sha256:" + "0".repeat(64)
@@ -29,8 +35,17 @@ class Receipts(
 
     suspend fun init(): Receipts {
         Files.createDirectories(dir)
+        writePublicKey()
         loadLastState()
         return this
+    }
+
+    private fun writePublicKey() {
+        val pubKeyPath = dir.resolve("public.key")
+        if (Files.notExists(pubKeyPath)) {
+            val pubKeyBytes = signingKey.publicKeyBytes()
+            Files.writeString(pubKeyPath, java.util.Base64.getEncoder().encodeToString(pubKeyBytes))
+        }
     }
 
     private fun loadLastState() {
@@ -55,7 +70,25 @@ class Receipts(
     override suspend fun append(partial: PartialReceipt): Long = mutex.withLock {
         val seq = currentSeq++
         val ts = java.time.Instant.now().toString()
-        val canonical = buildCanonical(seq, ts, partial)
+        val month = ts.substring(0, 7)
+        val argsRedactedJson = partial.argsRedacted
+        val argsRedactedStr = argsRedactedJson.toString()
+
+        val canonicalEntries = listOf(
+            "seq" to seq,
+            "ts" to ts,
+            "sessionId" to partial.sessionId,
+            "turnId" to partial.turnId,
+            "tool" to partial.tool,
+            "argsRedacted" to argsRedactedStr,
+            "risk" to partial.risk,
+            "approval" to mapOf("required" to false),
+            "durationMs" to partial.durationMs,
+            "ok" to partial.ok,
+            "resultHash" to "sha256:${sha256Hex(argsRedactedStr.toByteArray())}",
+            "prevHash" to lastHash,
+        )
+        val canonical = CanonicalJson.serializeCanonical(canonicalEntries)
         val selfHash = "sha256:${sha256Hex(canonical.toByteArray())}"
         val sigBytes = signingKey.sign(hexToBytes(selfHash.removePrefix("sha256:")))
         val sig = "$SIG_ALGORITHM:${java.util.Base64.getUrlEncoder().encodeToString(sigBytes)}"
@@ -66,49 +99,47 @@ class Receipts(
             sessionId = partial.sessionId,
             turnId = partial.turnId,
             tool = partial.tool,
-            argsRedacted = partial.argsRedacted,
+            argsRedacted = argsRedactedStr,
             risk = partial.risk,
             approval = ApprovalRecord(required = false),
             durationMs = partial.durationMs,
             ok = partial.ok,
-            resultHash = "sha256:${sha256Hex(partial.argsRedacted.toByteArray())}",
+            resultHash = "sha256:${sha256Hex(argsRedactedStr.toByteArray())}",
             prevHash = lastHash,
             selfHash = selfHash,
             sig = sig,
         )
 
-        val monthFile = dir.resolve("${ts.substring(0, 7)}.log")
-        Files.writeString(
-            monthFile,
-            Json.encodeToString(receiptSerializer, receipt) + "\n",
-            java.nio.file.StandardOpenOption.CREATE,
-            java.nio.file.StandardOpenOption.APPEND,
-        )
+        val monthFile = dir.resolve("$month.log")
+
+        if (month != currentMonth) {
+            currentChannel?.close()
+            currentChannel = null
+            currentMonth = month
+        }
+
+        var channel = currentChannel
+        if (channel == null) {
+            channel = FileChannel.open(
+                monthFile,
+                StandardOpenOption.CREATE,
+                StandardOpenOption.APPEND,
+                StandardOpenOption.WRITE,
+            )
+            currentChannel = channel
+        }
+
+        val line = Json.encodeToString(receiptSerializer, receipt) + "\n"
+        channel!!.write(java.nio.ByteBuffer.wrap(line.toByteArray()))
 
         lastHash = receipt.selfHash
         fsyncCounter++
         if (fsyncCounter >= fsyncBatchSize) {
+            channel!!.force(true)
             fsyncCounter = 0
         }
 
         return seq
-    }
-
-    private fun buildCanonical(seq: Long, ts: String, partial: PartialReceipt): String {
-        return buildString {
-            append("seq:$seq")
-            append(",ts:$ts")
-            append(",sessionId:${partial.sessionId}")
-            append(",turnId:${partial.turnId}")
-            append(",tool:${partial.tool}")
-            append(",argsRedacted:${partial.argsRedacted}")
-            append(",risk:${partial.risk}")
-            append(",approval:{required:false}")
-            append(",durationMs:${partial.durationMs}")
-            append(",ok:${partial.ok}")
-            append(",resultHash:sha256:${sha256Hex(partial.argsRedacted.toByteArray())}")
-            append(",prevHash:$lastHash")
-        }
     }
 
     private fun sha256Hex(data: ByteArray): String {

@@ -1,4 +1,4 @@
-package com.hebe.security.policy
+package com.hebe.api.security
 
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement

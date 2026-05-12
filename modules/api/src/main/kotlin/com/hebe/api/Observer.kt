@@ -84,4 +84,12 @@ sealed class ObserverEvent {
     data class PluginLoaded(
         val pluginId: String,
     ) : ObserverEvent()
+
+    @Serializable
+    @SerialName("leak_detected")
+    data class LeakDetected(
+        val toolName: String,
+        val rule: String,
+        val severity: String,
+    ) : ObserverEvent()
 }

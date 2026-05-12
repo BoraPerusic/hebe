@@ -27,6 +27,7 @@ class LogbackObserver(
                 is ObserverEvent.ApprovalResolved -> Level.INFO
                 is ObserverEvent.MemoryDbReady -> Level.INFO
                 is ObserverEvent.PluginLoaded -> Level.INFO
+                is ObserverEvent.LeakDetected -> Level.WARN
             }
 
         val sessionId: String? =

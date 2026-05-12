@@ -3,6 +3,14 @@ package com.hebe.cli
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.hebe.security.estop.EstopIpc
+import com.hebe.security.receipts.ReceiptVerifier
+import com.hebe.security.receipts.VerifyResult
+import java.nio.file.Path
+import java.nio.file.Paths
+import kotlin.io.path.exists
+import kotlin.io.path.readText
 
 fun main(args: Array<String>) {
     HebeCLI().main(args)
@@ -129,12 +137,52 @@ class OnboardCommand : CliktCommand(name = "onboard") {
 
 class EstopCommand : CliktCommand(name = "estop") {
     override fun run() {
-        echo("Not yet implemented: hebe estop")
+        val socketPath = EstopIpc.getSocketPath(
+            Paths.get(System.getProperty("user.home"), ".hebe"),
+        )
+        echo("Sending estop to local hebe instance…")
+        val ok = EstopIpc.sendStop(socketPath)
+        if (ok) {
+            echo("Acknowledged. In-flight tool calls cancelled. Pending approvals expired.")
+        } else {
+            echo("Error: could not reach hebe instance at $socketPath — is it running?")
+        }
     }
 }
 
 class MemoryShowCommand : CliktCommand(name = "memory show") {
+    private val pathArg by argument(help = "Path to receipts directory or file")
+
     override fun run() {
-        echo("Not yet implemented: hebe memory show")
+        val path = Paths.get(pathArg)
+        val publicKeyPath = Paths.get(System.getProperty("user.home"), ".hebe", "receipts", "public.key")
+
+        if (!path.exists()) {
+            echo("Error: Path not found: $path")
+            return
+        }
+
+        val publicKeyBytes = if (publicKeyPath.exists()) {
+            java.util.Base64.getDecoder().decode(publicKeyPath.readText().trim())
+        } else {
+            echo("Error: Public key not found at $publicKeyPath")
+            return
+        }
+
+        val verifier = ReceiptVerifier()
+        val result = if (path.toFile().isDirectory) {
+            verifier.verifyDirectory(path, publicKeyBytes)
+        } else {
+            verifier.verify(path, publicKeyBytes)
+        }
+
+        when (result) {
+            is VerifyResult.Ok -> {
+                echo("OK ${result.records} records, last hash: ${result.lastSelfHash}")
+            }
+            is VerifyResult.Failed -> {
+                echo("FAILED at record ${result.recordSeq}: ${result.reason}")
+            }
+        }
     }
 }

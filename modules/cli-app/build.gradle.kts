@@ -13,4 +13,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
     implementation(project(":modules:config"))
     implementation(project(":modules:observability"))
+    implementation(project(":modules:security"))
+    implementation(project(":modules:tools:dispatch"))
 }

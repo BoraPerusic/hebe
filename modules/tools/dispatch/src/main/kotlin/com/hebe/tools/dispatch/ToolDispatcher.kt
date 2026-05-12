@@ -14,13 +14,15 @@ import com.hebe.api.Span
 import com.hebe.api.Tool
 import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
+import com.hebe.api.Validator
+import com.hebe.api.security.ArgsRedactor
 import java.util.UUID
 import kotlin.time.Clock
 import org.slf4j.LoggerFactory
 
 class ToolDispatcher(
     private val registry: ToolRegistry,
-    private val validators: List<DispatchValidator>,
+    private val validators: List<Validator>,
     private val approvalGate: ApprovalGate,
     private val memory: MemoryStore,
     private val observer: Observer,
@@ -29,6 +31,7 @@ class ToolDispatcher(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val loopDetector = LoopDetector()
+    private val dispatchValidators: List<DispatchValidator> = validators.map { it.toDispatchValidator() }
 
     suspend fun dispatch(
         call: ParsedToolCall,
@@ -116,7 +119,7 @@ class ToolDispatcher(
         ctx: ToolContext,
     ): DispatchValidationResult {
         var result: DispatchValidationResult = DispatchValidationResult.Allow
-        for (validator in validators) {
+        for (validator in dispatchValidators) {
             result = validator.validate(call, tool, ctx)
             if (result !is DispatchValidationResult.Allow) break
         }
@@ -137,7 +140,7 @@ class ToolDispatcher(
                 sessionId = ctx.sessionId,
                 turnId = ctx.turnId,
                 tool = call.name,
-                argsRedacted = call.args.toString(),
+                argsRedacted = ArgsRedactor.INSTANCE.redact(call.args).toString(),
                 risk = tool.risk.name,
                 durationMs = durationMs,
                 ok = result is ToolResult.Ok,

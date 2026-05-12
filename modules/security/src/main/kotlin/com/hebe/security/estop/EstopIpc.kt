@@ -1,5 +1,6 @@
 package com.hebe.security.estop
 
+import java.nio.channels.ServerSocketChannel
 import java.nio.file.Path
 
 object EstopIpc {
@@ -25,6 +26,33 @@ object EstopIpc {
             }
         } catch (e: Exception) {
             false
+        }
+    }
+
+    fun startServer(socketPath: Path, onStop: () -> Unit) {
+        val server = ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX)
+        try {
+            java.nio.file.Files.deleteIfExists(socketPath)
+            server.bind(java.net.UnixDomainSocketAddress.of(socketPath))
+            while (true) {
+                try {
+                    val socket = server.accept()
+                    socket.use { s ->
+                        val data = s.socket().getInputStream().readBytes().toString(Charsets.UTF_8)
+                        if (data.trim() == "STOP") {
+                            onStop()
+                            s.socket().getOutputStream().use { out ->
+                                out.write("OK\n".toByteArray())
+                                out.flush()
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    break
+                }
+            }
+        } finally {
+            server.close()
         }
     }
 }

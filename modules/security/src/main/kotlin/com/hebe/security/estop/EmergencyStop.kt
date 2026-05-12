@@ -1,6 +1,9 @@
 package com.hebe.security.estop
 
+import com.hebe.api.PartialReceipt
+import com.hebe.api.Receipts
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -9,6 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class EmergencyStop(
     private val scope: CoroutineScope,
+    private val receipts: Receipts? = null,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val stopFlag = AtomicBoolean(false)
@@ -25,6 +29,18 @@ class EmergencyStop(
         logger.warn("Emergency stop requested")
         stopFlag.set(true)
         stopChannel.send(Unit)
+        receipts?.append(
+            PartialReceipt(
+                sessionId = "estop",
+                turnId = "estop",
+                tool = "_estop",
+                argsRedacted = "{}",
+                risk = "High",
+                durationMs = 0,
+                ok = false,
+            ),
+        )
+        scope.cancel()
     }
 
     fun reset() {

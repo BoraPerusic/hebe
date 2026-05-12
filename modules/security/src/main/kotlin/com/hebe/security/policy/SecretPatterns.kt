@@ -1,8 +1,5 @@
 package com.hebe.security.policy
 
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-
 object SecretPatterns {
     data class Pattern(
         val name: String,
@@ -80,32 +77,5 @@ object SecretPatterns {
             -p * (kotlin.math.ln(p) / kotlin.math.ln(2.0))
         }
         return entropy > 4.5
-    }
-}
-
-class LeakDetectorImpl(
-    private val patterns: List<SecretPatterns.Pattern> = SecretPatterns.defaultPatterns,
-) : com.hebe.api.LeakDetector {
-    override fun scan(result: com.hebe.api.ToolResult): com.hebe.api.ToolResult {
-        if (result !is com.hebe.api.ToolResult.Ok) return result
-
-        val contentStr = result.content.toString()
-        for (pattern in patterns) {
-            if (pattern.regex.containsMatchIn(contentStr)) {
-                return com.hebe.api.ToolResult.Err(
-                    "output blocked: leak detector matched rule: ${pattern.name}",
-                    retriable = false,
-                )
-            }
-        }
-
-        if (SecretPatterns.hasHighEntropy(contentStr)) {
-            return com.hebe.api.ToolResult.Err(
-                "output blocked: leak detector detected high-entropy content",
-                retriable = false,
-            )
-        }
-
-        return result
     }
 }

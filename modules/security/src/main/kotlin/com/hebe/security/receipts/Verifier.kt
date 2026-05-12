@@ -58,13 +58,13 @@ class ReceiptVerifier {
                 return VerifyResult.Failed(seq, "self_hash mismatch")
             }
 
-            val sigParts = receipt.sig.split(":")
-            if (sigParts.size != 2 || sigParts[0] != "ed25519:base64url") {
+            val sigPrefix = "ed25519:base64url:"
+            if (!receipt.sig.startsWith(sigPrefix)) {
                 return VerifyResult.Failed(seq, "Invalid signature format")
             }
 
             val signatureBytes = try {
-                java.util.Base64.getUrlDecoder().decode(sigParts[1])
+                java.util.Base64.getUrlDecoder().decode(receipt.sig.removePrefix(sigPrefix))
             } catch (e: Exception) {
                 return VerifyResult.Failed(seq, "Failed to decode signature")
             }
@@ -94,6 +94,7 @@ class ReceiptVerifier {
         }
 
         var lastSelfHash = ZERO_HASH
+        var totalRecords = 0
 
         for (file in files) {
             val result = verify(file, publicKey, lastSelfHash)
@@ -101,28 +102,30 @@ class ReceiptVerifier {
                 is VerifyResult.Failed -> return result
                 is VerifyResult.Ok -> {
                     lastSelfHash = result.lastSelfHash
+                    totalRecords += result.records
                 }
             }
         }
 
-        return VerifyResult.Ok(0, lastSelfHash)
+        return VerifyResult.Ok(totalRecords, lastSelfHash)
     }
 
     private fun buildCanonical(receipt: Receipt): String {
-        return buildString {
-            append("seq:${receipt.seq}")
-            append(",ts:${receipt.ts}")
-            append(",sessionId:${receipt.sessionId}")
-            append(",turnId:${receipt.turnId}")
-            append(",tool:${receipt.tool}")
-            append(",argsRedacted:${receipt.argsRedacted}")
-            append(",risk:${receipt.risk}")
-            append(",approval:{required:${receipt.approval.required}}")
-            append(",durationMs:${receipt.durationMs}")
-            append(",ok:${receipt.ok}")
-            append(",resultHash:${receipt.resultHash}")
-            append(",prevHash:${receipt.prevHash}")
-        }
+        val canonicalEntries = listOf(
+            "seq" to receipt.seq,
+            "ts" to receipt.ts,
+            "sessionId" to receipt.sessionId,
+            "turnId" to receipt.turnId,
+            "tool" to receipt.tool,
+            "argsRedacted" to receipt.argsRedacted,
+            "risk" to receipt.risk,
+            "approval" to mapOf("required" to receipt.approval.required),
+            "durationMs" to receipt.durationMs,
+            "ok" to receipt.ok,
+            "resultHash" to receipt.resultHash,
+            "prevHash" to receipt.prevHash,
+        )
+        return CanonicalJson.serializeCanonical(canonicalEntries)
     }
 
     private fun sha256Hex(data: ByteArray): String {

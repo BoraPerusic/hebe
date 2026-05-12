@@ -1,0 +1,59 @@
+package com.hebe.security.policy
+
+import com.hebe.api.LeakDetector
+import com.hebe.api.Observer
+import com.hebe.api.ObserverEvent
+import com.hebe.api.ToolResult
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+
+class LeakDetector(
+    private val patterns: List<SecretPatterns.Pattern> = SecretPatterns.defaultPatterns,
+    private val observer: Observer? = null,
+) : LeakDetector {
+    override fun scan(result: ToolResult): ToolResult {
+        if (result !is ToolResult.Ok) return result
+
+        val contentStr = result.content.toString()
+
+        for (pattern in patterns) {
+            if (pattern.regex.containsMatchIn(contentStr)) {
+                observer?.event(
+                    ObserverEvent.LeakDetected(
+                        toolName = "unknown",
+                        rule = pattern.name,
+                        severity = pattern.severity.name,
+                    ),
+                )
+                return ToolResult.Err(
+                    "output blocked: leak detector matched rule: ${pattern.name}",
+                    retriable = false,
+                )
+            }
+        }
+
+        if (hasHighEntropyToken(contentStr)) {
+            return ToolResult.Err(
+                "output blocked: leak detector detected high-entropy content",
+                retriable = false,
+            )
+        }
+
+        return result
+    }
+
+    private fun hasHighEntropyToken(content: String): Boolean {
+        val candidatePattern = Regex("[A-Za-z0-9_-]{32,}")
+        val candidates = candidatePattern.findAll(content).map { it.value }
+
+        for (candidate in candidates) {
+            if (SecretPatterns.isWhitelisted(candidate)) continue
+            if (SecretPatterns.hasHighEntropy(candidate)) return true
+        }
+
+        return false
+    }
+}
