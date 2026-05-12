@@ -1,0 +1,68 @@
+package com.hebe.tools.builtin.file
+
+import com.hebe.api.RiskLevel
+import com.hebe.api.Tool
+import com.hebe.api.ToolContext
+import com.hebe.api.ToolResult
+import com.hebe.api.ToolSpec
+import com.hebe.api.workspace.WorkspacePath
+import com.hebe.memory.workspace.WorkspaceFs
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import org.slf4j.LoggerFactory
+import java.nio.file.Files
+import java.nio.file.Path
+
+class FileSystemListTool(
+    private val fs: WorkspaceFs,
+    private val workspaceRoot: Path,
+) : Tool {
+    private val logger = LoggerFactory.getLogger(javaClass)
+
+    override val spec = ToolSpec(
+        name = "file_system_list",
+        description = "List files in the workspace.",
+        schema = buildJsonObject {
+            put("type", JsonPrimitive("object"))
+            put(
+                "properties",
+                buildJsonObject {
+                    put(
+                        "prefix",
+                        buildJsonObject {
+                            put("type", JsonPrimitive("string"))
+                            put("description", JsonPrimitive("Workspace-relative prefix (default: empty = root)"))
+                            put("default", JsonPrimitive(""))
+                        },
+                    )
+                },
+            )
+        },
+        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+    )
+
+    override val risk = RiskLevel.Low
+    override val readOnly = true
+
+    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
+        val prefixStr = args["prefix"]?.jsonPrimitive?.content ?: ""
+        val prefix = WorkspacePath(prefixStr)
+        logger.debug("listing workspace prefix: {}", prefix.value)
+
+        val files = fs.list(prefix)
+        val items = files.map { wp ->
+            val absPath = workspaceRoot.resolve(wp.value)
+            val size = if (Files.exists(absPath)) Files.size(absPath) else 0L
+            val modified = if (Files.exists(absPath)) Files.getLastModifiedTime(absPath).toMillis() else 0L
+            buildJsonObject {
+                put("name", JsonPrimitive(wp.value))
+                put("size", JsonPrimitive(size))
+                put("modified", JsonPrimitive(modified))
+            }
+        }
+        return ToolResult.Ok(buildJsonArray { items.forEach { add(it) } })
+    }
+}
