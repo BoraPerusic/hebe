@@ -10,21 +10,22 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.last
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonObject
 
 class ApprovalGate(
     private val repo: PendingApprovalsRepo,
     private val ttlMillis: Long = 24 * 3600 * 1000L,
-) {
+) : com.hebe.api.ApprovalGate {
     private val waiters = ConcurrentHashMap<String, Channel<ApprovalStatus>>()
 
-    fun requestIfNeeded(
+    override fun requestIfNeeded(
         tool: Tool,
         args: JsonObject,
         turnId: String,
         channel: String,
-        threadExtId: String? = null,
+        threadExtId: String?,
     ): Flow<ApprovalStatus> =
         flow {
             val approvalId = UUID.randomUUID().toString()
@@ -63,7 +64,19 @@ class ApprovalGate(
             emit(decision)
         }
 
-    fun resolve(
+    suspend fun awaitApproval(
+        tool: Tool,
+        args: JsonObject,
+        turnId: String,
+        channel: String,
+        threadExtId: String? = null,
+    ): Boolean {
+        val flow = requestIfNeeded(tool, args, turnId, channel, threadExtId)
+        val status = flow.last()
+        return status == ApprovalStatus.Approved
+    }
+
+    override fun resolve(
         approvalId: String,
         approved: Boolean,
     ): Boolean {

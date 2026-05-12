@@ -18,6 +18,7 @@ data class ProviderCapabilities(
     val multimodal: Boolean,
     val maxContextTokens: Int,
     val supportsPromptCaching: Boolean = false,
+    val defaultModel: String = "",
 )
 
 @Serializable

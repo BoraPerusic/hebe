@@ -12,6 +12,7 @@ data class HebeConfig(
     val channels: ChannelsSection,
     val plugins: PluginsSection,
     val mcp: McpSection,
+    val cost: CostSection = CostSection(),
 )
 
 @Serializable
@@ -64,6 +65,13 @@ data class SchedulerSection(
     val dailyDigestCron: String = "5 0 * * *",
     val summarisationCron: String = "*/30 * * * *",
     val factExtractCron: String = "10 * * * *",
+)
+
+@Serializable
+data class CostSection(
+    val dailyUsdCap: Double = 5.0,
+    val perTurnTokenCap: Int = 100_000,
+    val compactionThreshold: Double = 0.6,
 )
 
 @Serializable

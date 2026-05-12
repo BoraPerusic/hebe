@@ -29,7 +29,7 @@ clean:
 build-kt module:
     ./gradlew :{{module}}:build --no-build-cache
 
-build-all:
+build:
     ./gradlew :modules:api:build :modules:plugin-api:build :modules:observability:build :modules:config:build :modules:cli-app:build :modules:detekt-rules:build --no-build-cache
 
 # Run Kotlin module tests
@@ -46,7 +46,7 @@ test:
 # =============================================================================
 
 # Regenerate protos for all languages
-proto-all:
+proto:
     # Shared proto build (placeholder - shared-proto module TBD)
     # ./gradlew :shared:libs:kotlin:shared-proto:assemble
     # ./gradlew :shared:libs:python:shared-proto:preparePythonPackage

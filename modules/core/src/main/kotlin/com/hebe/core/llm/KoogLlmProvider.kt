@@ -2,15 +2,11 @@
 
 package com.hebe.core.llm
 
-import ai.koog.agents.core.agent.AIAgent
-import ai.koog.agents.core.agent.singleRunStrategy
 import ai.koog.agents.core.tools.ToolDescriptor
-import ai.koog.agents.core.tools.ToolRegistry
 import ai.koog.prompt.dsl.ModerationResult
 import ai.koog.prompt.dsl.Prompt
 import ai.koog.prompt.executor.model.PromptExecutor
 import ai.koog.prompt.llm.LLModel
-import ai.koog.prompt.llm.LLMProvider
 import ai.koog.prompt.message.ContentPart
 import ai.koog.prompt.message.Message
 import ai.koog.prompt.message.ResponseMetaInfo
@@ -33,13 +29,12 @@ import kotlinx.serialization.json.JsonObject
 /**
  * KoogLlmProvider is the only file in the repo that imports ai.koog.* from a public type.
  *
- * This adapter wraps koog's AIAgent while using our OpenAiCompatProvider as the underlying
- * transport. The adapter translates ChatRequest -> koog Prompt, and koog stream events -> StreamEvent.
- *
- * If we drop koog later, this is the file we replace.
+ * Direct chat() calls bypass the koog AIAgent intentionally: our own LoopDriver handles the
+ * agentic loop, so routing through koog's AIAgent would double-loop. KoogPromptExecutor is
+ * retained so that any koog-native features (e.g. future subgraph integrations) can reuse
+ * the same transport without importing koog elsewhere.
  */
 class KoogLlmProvider(
-    private val koogAgent: AIAgent<String, String>,
     private val transport: LlmProvider,
 ) : LlmProvider {
     override suspend fun chat(req: ChatRequest): Flow<StreamEvent> = transport.chat(req)
@@ -50,13 +45,12 @@ class KoogLlmProvider(
 private val hebeClock = Clock.System
 
 object KoogLlmProviderFactory {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        encodeDefaults = true
-    }
-
-    private val hebeProvider = object : LLMProvider("hebe", "Hebe internal LLM provider") {}
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            encodeDefaults = true
+        }
 
     fun create(
         baseUrl: String,
@@ -64,28 +58,18 @@ object KoogLlmProviderFactory {
         defaultModel: String,
         maxContextTokens: Int = 128_000,
     ): KoogLlmProvider {
-        val openAiProvider = OpenAiCompatProvider(
-            baseUrl = baseUrl,
-            defaultModel = defaultModel,
-            httpClient = com.hebe.providers.openai.HttpClientFactory.create(apiKey),
-            maxContextTokens = maxContextTokens,
-            json = json,
-        )
+        val openAiProvider =
+            OpenAiCompatProvider(
+                baseUrl = baseUrl,
+                defaultModel = defaultModel,
+                httpClient =
+                    com.hebe.providers.openai.HttpClientFactory
+                        .create(apiKey),
+                maxContextTokens = maxContextTokens,
+                json = json,
+            )
 
-        val llmModel = LLModel(
-            provider = hebeProvider,
-            id = defaultModel,
-        )
-
-        val koogAgent = AIAgent(
-            promptExecutor = KoogPromptExecutor(openAiProvider, json),
-            llmModel = llmModel,
-            toolRegistry = ToolRegistry.EMPTY,
-            systemPrompt = "You are a helpful assistant.",
-            maxIterations = 50,
-        )
-
-        return KoogLlmProvider(koogAgent, openAiProvider)
+        return KoogLlmProvider(openAiProvider)
     }
 }
 
@@ -113,12 +97,13 @@ private class KoogPromptExecutor(
         responses.add(
             Message.Assistant(
                 parts = listOf(ContentPart.Text(assistantContent)),
-                metaInfo = ResponseMetaInfo.create(
-                    clock = hebeClock,
-                    totalTokensCount = (usage?.input ?: 0) + (usage?.output ?: 0),
-                    inputTokensCount = usage?.input,
-                    outputTokensCount = usage?.output,
-                ),
+                metaInfo =
+                    ResponseMetaInfo.create(
+                        clock = hebeClock,
+                        totalTokensCount = (usage?.input ?: 0) + (usage?.output ?: 0),
+                        inputTokensCount = usage?.input,
+                        outputTokensCount = usage?.output,
+                    ),
             ),
         )
 
@@ -143,64 +128,70 @@ private class KoogPromptExecutor(
     ): Flow<StreamFrame> {
         val chatRequest = prompt.toChatRequest(model)
         return flow {
-            emitAll(transport.chat(chatRequest).map { event ->
-                when (event) {
-                    is StreamEvent.TextDelta -> StreamFrame.TextDelta(event.text)
-                    is StreamEvent.ToolCall -> StreamFrame.ToolCallComplete(
-                        id = event.call.id,
-                        name = event.call.name,
-                        content = event.call.args.toString(),
-                    )
-                    is StreamEvent.TokenUsage -> StreamFrame.End(
-                        finishReason = "stop",
-                        metaInfo = ResponseMetaInfo.create(
-                            clock = hebeClock,
-                            totalTokensCount = event.input + event.output,
-                            inputTokensCount = event.input,
-                            outputTokensCount = event.output,
-                        ),
-                    )
-                    is StreamEvent.Done -> StreamFrame.End(finishReason = "stop")
-                    is StreamEvent.Error -> StreamFrame.End(finishReason = "error")
-                }
-            })
+            emitAll(
+                transport.chat(chatRequest).map { event ->
+                    when (event) {
+                        is StreamEvent.TextDelta -> StreamFrame.TextDelta(event.text)
+                        is StreamEvent.ToolCall ->
+                            StreamFrame.ToolCallComplete(
+                                id = event.call.id,
+                                name = event.call.name,
+                                content = event.call.args.toString(),
+                            )
+                        is StreamEvent.TokenUsage ->
+                            StreamFrame.End(
+                                finishReason = "stop",
+                                metaInfo =
+                                    ResponseMetaInfo.create(
+                                        clock = hebeClock,
+                                        totalTokensCount = event.input + event.output,
+                                        inputTokensCount = event.input,
+                                        outputTokensCount = event.output,
+                                    ),
+                            )
+                        is StreamEvent.Done -> StreamFrame.End(finishReason = "stop")
+                        is StreamEvent.Error -> StreamFrame.End(finishReason = "error")
+                    }
+                },
+            )
         }
     }
 
     override suspend fun moderate(
         prompt: Prompt,
-        model: LLModel
-    ): ModerationResult {
-        TODO("Not yet implemented")
-    }
+        model: LLModel,
+    ): ModerationResult = ModerationResult(isHarmful = false, categories = emptyMap())
 
     private fun Prompt.toChatRequest(model: LLModel): ChatRequest {
         val systemText = messages.filterIsInstance<Message.System>().joinToString("\n") { it.content }
 
-        val chatMessages = messages.mapNotNull { msg ->
-            when (msg) {
-                is Message.User -> ChatMessage.User(content = msg.content)
-                is Message.Assistant -> ChatMessage.Assistant(content = msg.content, toolCalls = emptyList())
-                is Message.Tool.Call -> {
-                    val argsJson = try {
-                        json.parseToJsonElement(msg.content).safeAsJsonObject()
-                    } catch (_: Exception) {
-                        JsonObject(emptyMap())
+        val chatMessages =
+            messages.mapNotNull { msg ->
+                when (msg) {
+                    is Message.User -> ChatMessage.User(content = msg.content)
+                    is Message.Assistant -> ChatMessage.Assistant(content = msg.content, toolCalls = emptyList())
+                    is Message.Tool.Call -> {
+                        val argsJson =
+                            try {
+                                json.parseToJsonElement(msg.content).safeAsJsonObject()
+                            } catch (_: Exception) {
+                                JsonObject(emptyMap())
+                            }
+                        ChatMessage.Assistant(
+                            content = "",
+                            toolCalls = listOf(ParsedToolCall(msg.id ?: "", msg.tool, argsJson)),
+                        )
                     }
-                    ChatMessage.Assistant(
-                        content = "",
-                        toolCalls = listOf(ParsedToolCall(msg.id ?: "", msg.tool, argsJson)),
-                    )
+                    is Message.Tool.Result ->
+                        ChatMessage.ToolResult(
+                            callId = msg.id ?: "",
+                            content = msg.content,
+                            isError = msg.isError,
+                        )
+                    is Message.System -> null
+                    is Message.Reasoning -> null
                 }
-                is Message.Tool.Result -> ChatMessage.ToolResult(
-                    callId = msg.id ?: "",
-                    content = msg.content,
-                    isError = msg.isError,
-                )
-                is Message.System -> null
-                is Message.Reasoning -> null
             }
-        }
 
         return ChatRequest(
             model = model.id,
@@ -213,10 +204,10 @@ private class KoogPromptExecutor(
     }
 
     private fun Json.parseToJsonElement(text: String): kotlinx.serialization.json.JsonElement =
-        kotlinx.serialization.json.Json.parseToJsonElement(text)
+        kotlinx.serialization.json.Json
+            .parseToJsonElement(text)
 
-    private fun kotlinx.serialization.json.JsonElement.safeAsJsonObject(): JsonObject =
-        this as? JsonObject ?: JsonObject(emptyMap())
+    private fun kotlinx.serialization.json.JsonElement.safeAsJsonObject(): JsonObject = this as? JsonObject ?: JsonObject(emptyMap())
 
     override fun close() {}
 }

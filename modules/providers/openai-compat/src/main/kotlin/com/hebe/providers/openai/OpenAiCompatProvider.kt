@@ -119,6 +119,7 @@ class OpenAiCompatProvider(
             multimodal = false,
             maxContextTokens = maxContextTokens,
             supportsPromptCaching = true,
+            defaultModel = defaultModel,
         )
 
     private fun buildChatRequest(req: ChatRequest): ChatCompletionRequest {

@@ -66,7 +66,7 @@ object SseParser {
                     }
                 }
 
-                if (acc.id.isNotEmpty() && acc.name.isNotEmpty() && acc.arguments.isNotEmpty()) {
+                if (acc.id.isNotEmpty() && acc.name.isNotEmpty() && isCompleteJson(acc.arguments.toString())) {
                     parts.add(
                         ParsedChunkPart.ToolCallReady(
                             id = acc.id.toString(),
@@ -80,6 +80,16 @@ object SseParser {
         }
 
         return parts
+    }
+
+    private fun isCompleteJson(s: String): Boolean {
+        if (s.isEmpty()) return false
+        return try {
+            Json.parseToJsonElement(s)
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     sealed class ParsedChunkPart {

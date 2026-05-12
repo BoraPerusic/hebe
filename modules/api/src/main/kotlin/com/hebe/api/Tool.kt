@@ -39,7 +39,15 @@ interface ApprovalGate {
     fun requestIfNeeded(
         tool: Tool,
         args: JsonObject,
+        turnId: String,
+        channel: String,
+        threadExtId: String? = null,
     ): kotlinx.coroutines.flow.Flow<ApprovalStatus>
+
+    fun resolve(
+        approvalId: String,
+        approved: Boolean,
+    ): Boolean
 }
 
 enum class ApprovalStatus {

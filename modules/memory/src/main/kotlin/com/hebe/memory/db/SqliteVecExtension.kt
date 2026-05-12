@@ -1,12 +1,14 @@
 package com.hebe.memory.db
 
-import java.lang.reflect.Method
+import java.io.File
 import java.sql.Connection
 
 object SqliteVecExtension {
-    private var loadedPlatform: String? = null
-
-    fun load(connection: Connection) {
+    /**
+     * Returns the path to the native vec0 extension for the current platform, extracting it from
+     * the classpath to a temp file if needed (e.g. when running from a fat JAR).
+     */
+    fun resolveLibPath(): File {
         val (os, arch) = detectPlatform()
         val libName = libName(os)
         val resource = "/native/sqlite-vec/$os-$arch/$libName"
@@ -15,27 +17,23 @@ object SqliteVecExtension {
             SqliteVecExtension::class.java.getResource(resource)
                 ?: error("sqlite-vec not found for $os-$arch at $resource")
 
-        val tmpFile =
-            if (url.protocol == "file") {
-                java.io.File(url.path)
-            } else {
-                val tmpDir =
-                    java.nio.file.Files
-                        .createTempDirectory("sqlite-vec")
-                val file = tmpDir.resolve(libName)
-                java.nio.file.Files
-                    .copy(url.openStream(), file)
-                file.toFile().setExecutable(true)
-                file.toFile()
-            }
-
-        val enableLoadExtension: Method =
-            connection.javaClass.getMethod("enableLoadExtension", Boolean::class.java)
-        enableLoadExtension.invoke(connection, true)
-        connection.createStatement().use { st ->
-            st.execute("SELECT load_extension('${tmpFile.absolutePath}')")
+        return if (url.protocol == "file") {
+            File(url.toURI())
+        } else {
+            val tmpDir = java.nio.file.Files.createTempDirectory("sqlite-vec")
+            val file = tmpDir.resolve(libName)
+            java.nio.file.Files.copy(url.openStream(), file)
+            file.toFile().setExecutable(true)
+            file.toFile()
         }
-        loadedPlatform = "$os-$arch"
+    }
+
+    /** Loads the vec0 extension on an already-extension-enabled connection. */
+    fun loadOnConnection(connection: Connection) {
+        val path = resolveLibPath().absolutePath
+        connection.createStatement().use { st ->
+            st.execute("SELECT load_extension('$path')")
+        }
     }
 
     private fun detectPlatform(): Pair<String, String> {
