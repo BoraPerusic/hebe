@@ -37,18 +37,22 @@ class ReceiptVerifier {
         for (line in lines) {
             if (line.isBlank()) continue
 
-            val receipt = try {
-                Receipt.fromJson(line)
-            } catch (e: Exception) {
-                return VerifyResult.Failed(seq, "Failed to parse receipt: ${e.message}")
-            }
+            val receipt =
+                try {
+                    Receipt.fromJson(line)
+                } catch (e: Exception) {
+                    return VerifyResult.Failed(seq, "Failed to parse receipt: ${e.message}")
+                }
 
             if (receipt.seq != seq) {
                 return VerifyResult.Failed(seq, "Expected seq $seq but found ${receipt.seq}")
             }
 
             if (receipt.prevHash != prevHash) {
-                return VerifyResult.Failed(seq, "prev_hash mismatch (expected ${prevHash.take(20)}..., got ${receipt.prevHash.take(20)}...)")
+                return VerifyResult.Failed(
+                    seq,
+                    "prev_hash mismatch (expected ${prevHash.take(20)}..., got ${receipt.prevHash.take(20)}...)",
+                )
             }
 
             val canonical = buildCanonical(receipt)
@@ -63,11 +67,14 @@ class ReceiptVerifier {
                 return VerifyResult.Failed(seq, "Invalid signature format")
             }
 
-            val signatureBytes = try {
-                java.util.Base64.getUrlDecoder().decode(receipt.sig.removePrefix(sigPrefix))
-            } catch (e: Exception) {
-                return VerifyResult.Failed(seq, "Failed to decode signature")
-            }
+            val signatureBytes =
+                try {
+                    java.util.Base64
+                        .getUrlDecoder()
+                        .decode(receipt.sig.removePrefix(sigPrefix))
+                } catch (e: Exception) {
+                    return VerifyResult.Failed(seq, "Failed to decode signature")
+                }
 
             if (!Ed25519Verifier.verify(publicKey, hexToBytes(receipt.selfHash.removePrefix("sha256:")), signatureBytes)) {
                 return VerifyResult.Failed(seq, "Signature verification failed")
@@ -84,10 +91,12 @@ class ReceiptVerifier {
         dir: Path,
         publicKey: ByteArray,
     ): VerifyResult {
-        val files = Files.list(dir)
-            .filter { it.fileName.toString().endsWith(".log") }
-            .sorted()
-            .toList()
+        val files =
+            Files
+                .list(dir)
+                .filter { it.fileName.toString().endsWith(".log") }
+                .sorted()
+                .toList()
 
         if (files.isEmpty()) {
             return VerifyResult.Ok(0, ZERO_HASH)
@@ -111,20 +120,21 @@ class ReceiptVerifier {
     }
 
     private fun buildCanonical(receipt: Receipt): String {
-        val canonicalEntries = listOf(
-            "seq" to receipt.seq,
-            "ts" to receipt.ts,
-            "sessionId" to receipt.sessionId,
-            "turnId" to receipt.turnId,
-            "tool" to receipt.tool,
-            "argsRedacted" to receipt.argsRedacted,
-            "risk" to receipt.risk,
-            "approval" to mapOf("required" to receipt.approval.required),
-            "durationMs" to receipt.durationMs,
-            "ok" to receipt.ok,
-            "resultHash" to receipt.resultHash,
-            "prevHash" to receipt.prevHash,
-        )
+        val canonicalEntries =
+            listOf(
+                "seq" to receipt.seq,
+                "ts" to receipt.ts,
+                "sessionId" to receipt.sessionId,
+                "turnId" to receipt.turnId,
+                "tool" to receipt.tool,
+                "argsRedacted" to receipt.argsRedacted,
+                "risk" to receipt.risk,
+                "approval" to mapOf("required" to receipt.approval.required),
+                "durationMs" to receipt.durationMs,
+                "ok" to receipt.ok,
+                "resultHash" to receipt.resultHash,
+                "prevHash" to receipt.prevHash,
+            )
         return CanonicalJson.serializeCanonical(canonicalEntries)
     }
 
@@ -133,9 +143,7 @@ class ReceiptVerifier {
         return digest.digest(data).joinToString("") { "%02x".format(it) }
     }
 
-    private fun hexToBytes(hex: String): ByteArray {
-        return hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-    }
+    private fun hexToBytes(hex: String): ByteArray = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 
     companion object {
         private val ZERO_HASH = "sha256:" + "0".repeat(64)

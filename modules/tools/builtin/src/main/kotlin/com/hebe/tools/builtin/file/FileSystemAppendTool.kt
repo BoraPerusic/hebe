@@ -22,43 +22,56 @@ class FileSystemAppendTool(
 ) : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    override val spec = ToolSpec(
-        name = "file_system_append",
-        description = "Append content to a file in the workspace.",
-        schema = buildJsonObject {
-            put("type", JsonPrimitive("object"))
-            put("required", buildJsonArray { add(JsonPrimitive("path")); add(JsonPrimitive("content")) })
-            put(
-                "properties",
+    override val spec =
+        ToolSpec(
+            name = "file_system_append",
+            description = "Append content to a file in the workspace.",
+            schema =
                 buildJsonObject {
+                    put("type", JsonPrimitive("object"))
                     put(
-                        "path",
-                        buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Workspace-relative destination path"))
+                        "required",
+                        buildJsonArray {
+                            add(JsonPrimitive("path"))
+                            add(JsonPrimitive("content"))
                         },
                     )
                     put(
-                        "content",
+                        "properties",
                         buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Content to append"))
+                            put(
+                                "path",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Workspace-relative destination path"))
+                                },
+                            )
+                            put(
+                                "content",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Content to append"))
+                                },
+                            )
                         },
                     )
                 },
-            )
-        },
-        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
-    )
+            pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+        )
 
     override val risk = RiskLevel.Medium
     override val readOnly = false
 
-    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
-        val pathStr = args["path"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: path")
-        val content = args["content"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: content")
+    override suspend fun invoke(
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolResult {
+        val pathStr =
+            args["path"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: path")
+        val content =
+            args["content"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: content")
 
         val path = WorkspacePath(pathStr)
         logger.debug("appending workspace path: {}", path.value)

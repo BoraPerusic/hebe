@@ -16,39 +16,75 @@ import org.slf4j.LoggerFactory
 class ScheduleTool : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    override val spec = ToolSpec(
-        name = "schedule",
-        description = "CRUD for scheduled routines. Risk: Medium.",
-        schema = buildJsonObject {
-            put("type", JsonPrimitive("object"))
-            put("required", buildJsonArray { add(JsonPrimitive("verb")) })
-            put(
-                "properties",
+    override val spec =
+        ToolSpec(
+            name = "schedule",
+            description = "CRUD for scheduled routines. Risk: Medium.",
+            schema =
                 buildJsonObject {
+                    put("type", JsonPrimitive("object"))
+                    put("required", buildJsonArray { add(JsonPrimitive("verb")) })
                     put(
-                        "verb",
+                        "properties",
                         buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Verb: create | list | disable | enable | delete"))
+                            put(
+                                "verb",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Verb: create | list | disable | enable | delete"))
+                                },
+                            )
+                            put(
+                                "name",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Routine name"))
+                                },
+                            )
+                            put(
+                                "cron",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Cron expression"))
+                                },
+                            )
+                            put(
+                                "body_kind",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("skill or tool"))
+                                },
+                            )
+                            put(
+                                "body_ref",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Skill name or tool name"))
+                                },
+                            )
+                            put(
+                                "id",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Routine ID for delete"))
+                                },
+                            )
                         },
                     )
-                    put("name", buildJsonObject { put("type", JsonPrimitive("string")); put("description", JsonPrimitive("Routine name")) })
-                    put("cron", buildJsonObject { put("type", JsonPrimitive("string")); put("description", JsonPrimitive("Cron expression")) })
-                    put("body_kind", buildJsonObject { put("type", JsonPrimitive("string")); put("description", JsonPrimitive("skill or tool")) })
-                    put("body_ref", buildJsonObject { put("type", JsonPrimitive("string")); put("description", JsonPrimitive("Skill name or tool name")) })
-                    put("id", buildJsonObject { put("type", JsonPrimitive("string")); put("description", JsonPrimitive("Routine ID for delete")) })
                 },
-            )
-        },
-        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
-    )
+            pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+        )
 
     override val risk = RiskLevel.Medium
     override val readOnly = false
 
-    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
-        val verb = args["verb"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: verb")
+    override suspend fun invoke(
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolResult {
+        val verb =
+            args["verb"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: verb")
 
         logger.debug("schedule verb={}", verb)
 
@@ -63,14 +99,18 @@ class ScheduleTool : Tool {
     }
 
     private fun createRoutine(args: JsonObject): ToolResult {
-        val name = args["name"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("name required for create")
-        val cron = args["cron"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("cron required for create")
-        val bodyKind = args["body_kind"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("body_kind required for create")
-        val bodyRef = args["body_ref"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("body_ref required for create")
+        val name =
+            args["name"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("name required for create")
+        val cron =
+            args["cron"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("cron required for create")
+        val bodyKind =
+            args["body_kind"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("body_kind required for create")
+        val bodyRef =
+            args["body_ref"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("body_ref required for create")
 
         if (!isValidCron(cron)) {
             return ToolResult.Err("invalid cron expression: $cron")
@@ -93,29 +133,39 @@ class ScheduleTool : Tool {
         return ToolResult.Ok(JsonArray(emptyList()))
     }
 
-    private fun updateRoutine(args: JsonObject, enabled: Boolean): ToolResult {
-        val id = args["id"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("id required")
-        return ToolResult.Ok(buildJsonObject {
-            put("id", JsonPrimitive(id))
-            put("enabled", JsonPrimitive(enabled))
-        })
+    private fun updateRoutine(
+        args: JsonObject,
+        enabled: Boolean,
+    ): ToolResult {
+        val id =
+            args["id"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("id required")
+        return ToolResult.Ok(
+            buildJsonObject {
+                put("id", JsonPrimitive(id))
+                put("enabled", JsonPrimitive(enabled))
+            },
+        )
     }
 
     private fun deleteRoutine(args: JsonObject): ToolResult {
-        val id = args["id"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("id required")
-        return ToolResult.Ok(buildJsonObject {
-            put("id", JsonPrimitive(id))
-            put("deleted", JsonPrimitive(true))
-        })
+        val id =
+            args["id"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("id required")
+        return ToolResult.Ok(
+            buildJsonObject {
+                put("id", JsonPrimitive(id))
+                put("deleted", JsonPrimitive(true))
+            },
+        )
     }
 
     private fun isValidCron(cron: String): Boolean {
         val parts = cron.split(" ")
         if (parts.size !in 5..6) return false
         return parts.all { part ->
-            part == "*" || part.matches(Regex("^\\d+(-\\d+)?(,\\d+(-\\d+)?)*$")) ||
+            part == "*" ||
+                part.matches(Regex("^\\d+(-\\d+)?(,\\d+(-\\d+)?)*$")) ||
                 part.matches(Regex("^\\*/\\d+$"))
         }
     }

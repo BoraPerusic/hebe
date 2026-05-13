@@ -22,84 +22,90 @@ class LoopDriverTest {
     private val ctx = mockk<ReasoningContext>(relaxed = true)
 
     @Test
-    fun `text response returns Response outcome`() = runTest {
-        val delegate = mockk<LoopDelegate>(relaxed = true)
-        coEvery { delegate.checkSignals() } returns LoopSignal.Continue
-        coEvery { delegate.beforeLlmCall(any(), any()) } returns null
-        coEvery { delegate.callLlm(any(), any()) } returns RespondOutput.TextOnly("hello")
-        coEvery { delegate.handleTextResponse("hello") } returns TextAction.FinishWith
+    fun `text response returns Response outcome`() =
+        runTest {
+            val delegate = mockk<LoopDelegate>(relaxed = true)
+            coEvery { delegate.checkSignals() } returns LoopSignal.Continue
+            coEvery { delegate.beforeLlmCall(any(), any()) } returns null
+            coEvery { delegate.callLlm(any(), any()) } returns RespondOutput.TextOnly("hello")
+            coEvery { delegate.handleTextResponse("hello") } returns TextAction.FinishWith
 
-        val result = runAgenticLoop(delegate, reasoning, ctx, LoopConfig(maxIterations = 5))
+            val result = runAgenticLoop(delegate, reasoning, ctx, LoopConfig(maxIterations = 5))
 
-        assertEquals(LoopOutcome.Response("hello"), result)
-    }
-
-    @Test
-    fun `tool calls are executed then loop continues to text`() = runTest {
-        val call = ParsedToolCall("id1", "tool", JsonObject(emptyMap()))
-        val delegate = mockk<LoopDelegate>(relaxed = true)
-        coEvery { delegate.checkSignals() } returns LoopSignal.Continue
-        coEvery { delegate.beforeLlmCall(any(), any()) } returns null
-        coEvery { delegate.callLlm(any(), any()) }
-            .returnsMany(RespondOutput.WithToolCalls(listOf(call)), RespondOutput.TextOnly("done"))
-        coEvery { delegate.executeToolCalls(any(), any()) } returns null
-        coEvery { delegate.handleTextResponse("done") } returns TextAction.FinishWith
-
-        val result = runAgenticLoop(delegate, reasoning, ctx, LoopConfig(maxIterations = 5))
-
-        assertEquals(LoopOutcome.Response("done"), result)
-        coVerify(exactly = 1) { delegate.executeToolCalls(listOf(call), ctx) }
-    }
+            assertEquals(LoopOutcome.Response("hello"), result)
+        }
 
     @Test
-    fun `max iterations returns MaxIterations`() = runTest {
-        val call = ParsedToolCall("id1", "tool", JsonObject(emptyMap()))
-        val delegate = mockk<LoopDelegate>(relaxed = true)
-        coEvery { delegate.checkSignals() } returns LoopSignal.Continue
-        coEvery { delegate.beforeLlmCall(any(), any()) } returns null
-        coEvery { delegate.callLlm(any(), any()) } returns RespondOutput.WithToolCalls(listOf(call))
-        coEvery { delegate.executeToolCalls(any(), any()) } returns null
+    fun `tool calls are executed then loop continues to text`() =
+        runTest {
+            val call = ParsedToolCall("id1", "tool", JsonObject(emptyMap()))
+            val delegate = mockk<LoopDelegate>(relaxed = true)
+            coEvery { delegate.checkSignals() } returns LoopSignal.Continue
+            coEvery { delegate.beforeLlmCall(any(), any()) } returns null
+            coEvery { delegate.callLlm(any(), any()) }
+                .returnsMany(RespondOutput.WithToolCalls(listOf(call)), RespondOutput.TextOnly("done"))
+            coEvery { delegate.executeToolCalls(any(), any()) } returns null
+            coEvery { delegate.handleTextResponse("done") } returns TextAction.FinishWith
 
-        val result = runAgenticLoop(delegate, reasoning, ctx, LoopConfig(maxIterations = 3))
+            val result = runAgenticLoop(delegate, reasoning, ctx, LoopConfig(maxIterations = 5))
 
-        assertEquals(LoopOutcome.MaxIterations, result)
-    }
-
-    @Test
-    fun `estop signal stops loop`() = runTest {
-        val delegate = mockk<LoopDelegate>(relaxed = true)
-        coEvery { delegate.checkSignals() } returns LoopSignal.Estop
-
-        val result = runAgenticLoop(delegate, reasoning, ctx, LoopConfig(maxIterations = 5))
-
-        assertEquals(LoopOutcome.Stopped, result)
-        coVerify(exactly = 0) { delegate.callLlm(any(), any()) }
-    }
+            assertEquals(LoopOutcome.Response("done"), result)
+            coVerify(exactly = 1) { delegate.executeToolCalls(listOf(call), ctx) }
+        }
 
     @Test
-    fun `beforeLlmCall abort propagates outcome`() = runTest {
-        val delegate = mockk<LoopDelegate>(relaxed = true)
-        coEvery { delegate.checkSignals() } returns LoopSignal.Continue
-        coEvery { delegate.beforeLlmCall(any(), any()) } returns LoopOutcome.Failure("budget exceeded")
+    fun `max iterations returns MaxIterations`() =
+        runTest {
+            val call = ParsedToolCall("id1", "tool", JsonObject(emptyMap()))
+            val delegate = mockk<LoopDelegate>(relaxed = true)
+            coEvery { delegate.checkSignals() } returns LoopSignal.Continue
+            coEvery { delegate.beforeLlmCall(any(), any()) } returns null
+            coEvery { delegate.callLlm(any(), any()) } returns RespondOutput.WithToolCalls(listOf(call))
+            coEvery { delegate.executeToolCalls(any(), any()) } returns null
 
-        val result = runAgenticLoop(delegate, reasoning, ctx, LoopConfig(maxIterations = 5))
+            val result = runAgenticLoop(delegate, reasoning, ctx, LoopConfig(maxIterations = 3))
 
-        assertTrue(result is LoopOutcome.Failure)
-        assertEquals("budget exceeded", (result as LoopOutcome.Failure).message)
-        coVerify(exactly = 0) { delegate.callLlm(any(), any()) }
-    }
+            assertEquals(LoopOutcome.MaxIterations, result)
+        }
 
     @Test
-    fun `executeToolCalls abort propagates outcome`() = runTest {
-        val call = ParsedToolCall("id1", "tool", JsonObject(emptyMap()))
-        val delegate = mockk<LoopDelegate>(relaxed = true)
-        coEvery { delegate.checkSignals() } returns LoopSignal.Continue
-        coEvery { delegate.beforeLlmCall(any(), any()) } returns null
-        coEvery { delegate.callLlm(any(), any()) } returns RespondOutput.WithToolCalls(listOf(call))
-        coEvery { delegate.executeToolCalls(any(), any()) } returns LoopOutcome.Failure("tool error")
+    fun `estop signal stops loop`() =
+        runTest {
+            val delegate = mockk<LoopDelegate>(relaxed = true)
+            coEvery { delegate.checkSignals() } returns LoopSignal.Estop
 
-        val result = runAgenticLoop(delegate, reasoning, ctx, LoopConfig(maxIterations = 5))
+            val result = runAgenticLoop(delegate, reasoning, ctx, LoopConfig(maxIterations = 5))
 
-        assertTrue(result is LoopOutcome.Failure)
-    }
+            assertEquals(LoopOutcome.Stopped, result)
+            coVerify(exactly = 0) { delegate.callLlm(any(), any()) }
+        }
+
+    @Test
+    fun `beforeLlmCall abort propagates outcome`() =
+        runTest {
+            val delegate = mockk<LoopDelegate>(relaxed = true)
+            coEvery { delegate.checkSignals() } returns LoopSignal.Continue
+            coEvery { delegate.beforeLlmCall(any(), any()) } returns LoopOutcome.Failure("budget exceeded")
+
+            val result = runAgenticLoop(delegate, reasoning, ctx, LoopConfig(maxIterations = 5))
+
+            assertTrue(result is LoopOutcome.Failure)
+            assertEquals("budget exceeded", (result as LoopOutcome.Failure).message)
+            coVerify(exactly = 0) { delegate.callLlm(any(), any()) }
+        }
+
+    @Test
+    fun `executeToolCalls abort propagates outcome`() =
+        runTest {
+            val call = ParsedToolCall("id1", "tool", JsonObject(emptyMap()))
+            val delegate = mockk<LoopDelegate>(relaxed = true)
+            coEvery { delegate.checkSignals() } returns LoopSignal.Continue
+            coEvery { delegate.beforeLlmCall(any(), any()) } returns null
+            coEvery { delegate.callLlm(any(), any()) } returns RespondOutput.WithToolCalls(listOf(call))
+            coEvery { delegate.executeToolCalls(any(), any()) } returns LoopOutcome.Failure("tool error")
+
+            val result = runAgenticLoop(delegate, reasoning, ctx, LoopConfig(maxIterations = 5))
+
+            assertTrue(result is LoopOutcome.Failure)
+        }
 }

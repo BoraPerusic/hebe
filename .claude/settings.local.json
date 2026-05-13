@@ -66,7 +66,25 @@
       "Bash(./gradlew :modules:security:compileKotlin :modules:cli-app:compileKotlin)",
       "Bash(./gradlew :modules:tools:builtin:compileTestKotlin)",
       "Bash(./gradlew :modules:tools:builtin:test)",
-      "Bash(./gradlew :modules:tools:builtin:test --rerun)"
+      "Bash(./gradlew :modules:tools:builtin:test --rerun)",
+      "Bash(./gradlew :modules:channels:channel-manager:compileTestKotlin :modules:channels:cli:compileTestKotlin :modules:channels:telegram:compileTestKotlin :modules:channels:web:compileTestKotlin :modules:gateway:compileTestKotlin --no-daemon -q)",
+      "Bash(./gradlew :modules:channels:channel-manager:test :modules:channels:cli:test :modules:channels:telegram:test :modules:channels:web:test :modules:gateway:test --no-daemon)",
+      "Bash(./gradlew :modules:channels:channel-manager:test --no-daemon)",
+      "Bash(./gradlew :modules:channels:cli:test :modules:channels:telegram:test :modules:channels:web:test :modules:gateway:test --no-daemon)",
+      "Bash(./gradlew :modules:channels:cli:test --no-daemon)",
+      "Bash(./gradlew :modules:channels:cli:test --no-daemon -q)",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(gtimeout 90 ./gradlew :modules:channels:cli:test --no-daemon)",
+      "Bash(./gradlew :modules:channels:cli:test --no-daemon --tests \"com.hebe.channels.cli.CliChannelTest.scripted*\")",
+      "Bash(./gradlew :modules:channels:telegram:test :modules:channels:web:test :modules:gateway:test --no-daemon)",
+      "Bash(./gradlew :modules:channels:telegram:test --no-daemon)",
+      "Bash(./gradlew :modules:channels:web:test :modules:gateway:test --no-daemon)",
+      "Bash(./gradlew :modules:gateway:compileTestKotlin --no-daemon)",
+      "Bash(./gradlew :modules:channels:channel-manager:test :modules:channels:cli:test :modules:channels:telegram:test :modules:channels:web:test :modules:gateway:test --no-daemon --rerun-tasks)",
+      "Bash(jobs *)",
+      "Bash(awk '{print $2, $11}')",
+      "Bash(./gradlew *)",
+      "Bash(just lint *)"
     ]
   }
 }

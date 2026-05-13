@@ -55,30 +55,38 @@ class CompactorTest {
     }
 
     @Test
-    fun `maybeCompact returns identity when under threshold`() = runTest {
-        val compactor = makeCompactor(maxTokens = 128_000, threshold = 0.6)
-        val history = listOf(msg("short"))
-        val result = compactor.maybeCompact(history, "t1")
-        assertFalse(result.compacted)
-        assertEquals(history, result.messages)
-    }
+    fun `maybeCompact returns identity when under threshold`() =
+        runTest {
+            val compactor = makeCompactor(maxTokens = 128_000, threshold = 0.6)
+            val history = listOf(msg("short"))
+            val result = compactor.maybeCompact(history, "t1")
+            assertFalse(result.compacted)
+            assertEquals(history, result.messages)
+        }
 
     @Test
-    fun `maybeCompact step2 summarises long history`() = runTest {
-        val compactor = makeCompactor(maxTokens = 100, threshold = 0.01)
-        val history = (1..20).map { msg("word ".repeat(10)) }
-        val result = compactor.maybeCompact(history, "t1")
-        assertTrue(result.compacted)
-        assertTrue(result.messages.size < history.size)
-        assertTrue(result.messages.first().content.startsWith("[Summary]"))
-    }
+    fun `maybeCompact step2 summarises long history`() =
+        runTest {
+            val compactor = makeCompactor(maxTokens = 100, threshold = 0.01)
+            val history = (1..20).map { msg("word ".repeat(10)) }
+            val result = compactor.maybeCompact(history, "t1")
+            assertTrue(result.compacted)
+            assertTrue(result.messages.size < history.size)
+            assertTrue(
+                result.messages
+                    .first()
+                    .content
+                    .startsWith("[Summary]"),
+            )
+        }
 
     @Test
-    fun `PreemptivePruner delegates to Compactor`() = runTest {
-        val compactor = makeCompactor(maxTokens = 128_000, threshold = 0.6)
-        val pruner = PreemptivePruner(compactor)
-        val history = listOf(msg("hello"))
-        val result = pruner.prune(history, "t1")
-        assertFalse(result.compacted)
-    }
+    fun `PreemptivePruner delegates to Compactor`() =
+        runTest {
+            val compactor = makeCompactor(maxTokens = 128_000, threshold = 0.6)
+            val pruner = PreemptivePruner(compactor)
+            val history = listOf(msg("hello"))
+            val result = pruner.prune(history, "t1")
+            assertFalse(result.compacted)
+        }
 }

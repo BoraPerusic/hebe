@@ -1,23 +1,19 @@
 package com.hebe.security.receipts
 
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArrayBuilder
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonObjectBuilder
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.JsonNull
-import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
 object CanonicalJson {
-    private val json = Json {
-        explicitNulls = false
-    }
+    private val json =
+        Json {
+            explicitNulls = false
+        }
 
-    fun serialize(obj: JsonObject): String {
-        return json.encodeToString(JsonObject.serializer(), obj)
-    }
+    fun serialize(obj: JsonObject): String = json.encodeToString(JsonObject.serializer(), obj)
 
     fun serializeCanonical(entries: List<Pair<String, Any?>>): String {
         val obj = buildCanonicalObject(entries)
@@ -33,18 +29,18 @@ object CanonicalJson {
         }
     }
 
-    private fun valueToJsonElement(value: Any?): JsonElement {
-        return when (value) {
+    private fun valueToJsonElement(value: Any?): JsonElement =
+        when (value) {
             null -> JsonNull
             is String -> JsonPrimitive(value)
             is Number -> JsonPrimitive(value)
             is Boolean -> JsonPrimitive(value)
-            is Map<*, *> -> buildJsonObject {
-                value.entries.sortedBy { it.key.toString() }.forEach { (k, v) ->
-                    put(k.toString(), valueToJsonElement(v))
+            is Map<*, *> ->
+                buildJsonObject {
+                    value.entries.sortedBy { it.key.toString() }.forEach { (k, v) ->
+                        put(k.toString(), valueToJsonElement(v))
+                    }
                 }
-            }
             else -> JsonPrimitive(value.toString())
         }
-    }
 }

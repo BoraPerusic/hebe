@@ -4,11 +4,6 @@ import com.hebe.api.LeakDetector
 import com.hebe.api.Observer
 import com.hebe.api.ObserverEvent
 import com.hebe.api.ToolResult
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNull
 
 class LeakDetector(
     private val patterns: List<SecretPatterns.Pattern> = SecretPatterns.defaultPatterns,

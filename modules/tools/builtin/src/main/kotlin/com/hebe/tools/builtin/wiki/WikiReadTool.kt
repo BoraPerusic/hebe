@@ -23,34 +23,40 @@ class WikiReadTool(
         private const val WIKI_PREFIX = "wiki/"
     }
 
-    override val spec = ToolSpec(
-        name = "wiki_read",
-        description = "Read a wiki page by slug. Maps slug to workspace/wiki/<slug>.md.",
-        schema = buildJsonObject {
-            put("type", JsonPrimitive("object"))
-            put("required", buildJsonArray { add(JsonPrimitive("slug")) })
-            put(
-                "properties",
+    override val spec =
+        ToolSpec(
+            name = "wiki_read",
+            description = "Read a wiki page by slug. Maps slug to workspace/wiki/<slug>.md.",
+            schema =
                 buildJsonObject {
+                    put("type", JsonPrimitive("object"))
+                    put("required", buildJsonArray { add(JsonPrimitive("slug")) })
                     put(
-                        "slug",
+                        "properties",
                         buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Wiki page slug (e.g. architecture)"))
+                            put(
+                                "slug",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Wiki page slug (e.g. architecture)"))
+                                },
+                            )
                         },
                     )
                 },
-            )
-        },
-        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
-    )
+            pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+        )
 
     override val risk = RiskLevel.Low
     override val readOnly = true
 
-    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
-        val slug = args["slug"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: slug")
+    override suspend fun invoke(
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolResult {
+        val slug =
+            args["slug"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: slug")
 
         val path = WorkspacePath("$WIKI_PREFIX$slug.md")
         logger.debug("wiki_read slug={} path={}", slug, path.value)

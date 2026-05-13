@@ -21,8 +21,8 @@ class AppComponents(
         val receipts: com.hebe.api.Receipts,
     )
 
-    fun createToolDispatcher(deps: DispatchDeps): ToolDispatcher {
-        return ToolDispatcher(
+    fun createToolDispatcher(deps: DispatchDeps): ToolDispatcher =
+        ToolDispatcher(
             registry = deps.registry,
             validators = validators,
             approvalGate = deps.approvalGate,
@@ -31,5 +31,4 @@ class AppComponents(
             leakDetector = deps.leakDetector,
             receipts = deps.receipts,
         )
-    }
 }

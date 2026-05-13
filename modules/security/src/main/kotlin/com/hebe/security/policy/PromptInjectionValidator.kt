@@ -23,13 +23,14 @@ class PromptInjectionValidator : Validator {
             return resultToValidation(cachedResult)
         }
 
-        val contentToScan = buildString {
-            for ((_, value) in call.args) {
-                if (value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
-                    appendLine(value.content)
+        val contentToScan =
+            buildString {
+                for ((_, value) in call.args) {
+                    if (value is kotlinx.serialization.json.JsonPrimitive && value.isString) {
+                        appendLine(value.content)
+                    }
                 }
             }
-        }
 
         val result = scanner.scan(contentToScan)
         turnVerdicts[ctx.turnId] = result
@@ -37,8 +38,8 @@ class PromptInjectionValidator : Validator {
         return resultToValidation(result)
     }
 
-    private fun resultToValidation(result: HygieneResult): ValidationResult {
-        return when (result) {
+    private fun resultToValidation(result: HygieneResult): ValidationResult =
+        when (result) {
             is HygieneResult.Clean -> ValidationResult.Allow
             is HygieneResult.Warn -> {
                 if (result.findings.any { it.severity == Severity.High }) {
@@ -51,14 +52,14 @@ class PromptInjectionValidator : Validator {
                 ValidationResult.Deny("Prompt injection blocked: ${summarize(result)}")
             }
         }
-    }
 
     private fun summarize(result: HygieneResult): String {
-        val findings = when (result) {
-            is HygieneResult.Clean -> return ""
-            is HygieneResult.Warn -> result.findings
-            is HygieneResult.Reject -> result.findings
-        }
+        val findings =
+            when (result) {
+                is HygieneResult.Clean -> return ""
+                is HygieneResult.Warn -> result.findings
+                is HygieneResult.Reject -> result.findings
+            }
         return findings.joinToString("; ") { it.rule }
     }
 

@@ -9,7 +9,6 @@ import com.hebe.api.LoopOutcome
 import com.hebe.api.MemoryStore
 import com.hebe.api.Observer
 import com.hebe.api.ProviderCapabilities
-import com.hebe.api.StreamEvent
 import com.hebe.config.CostSection
 import com.hebe.config.HebeConfig
 import com.hebe.core.compaction.Compactor
@@ -82,87 +81,100 @@ class ChatDelegateTest {
             override val turnId = turnId
             override val userId = "user1"
             override val requestor = mockk<Channel> { every { name } returns "cli" }
-            override val workspace = com.hebe.api.workspace.WorkspacePath(".")
+            override val workspace =
+                com.hebe.api.workspace
+                    .WorkspacePath(".")
             override val approvalGate = mockk<com.hebe.api.ApprovalGate>(relaxed = true)
             override val observer = mockk<Observer>(relaxed = true)
             override val secretLookup = mockk<com.hebe.api.SecretLookup>(relaxed = true)
         }
 
     @Test
-    fun `run returns Response for simple text turn`() = runTest {
-        val llm =
-            MockLlmProvider
-                .builder()
-                .turn {
-                    textDelta("Hello!")
+    fun `run returns Response for simple text turn`() =
+        runTest {
+            val llm =
+                MockLlmProvider
+                    .builder()
+                    .turn {
+                        textDelta("Hello!")
+                        done()
+                    }.build()
+            val (delegate, _) = makeDelegate(llm)
+            val result = delegate.run(reasoning, ctx(), LoopConfig(maxIterations = 5))
+            assertEquals(LoopOutcome.Response("Hello!"), result)
+        }
+
+    @Test
+    fun `run records cost after LLM call`() =
+        runTest {
+            val llm =
+                MockLlmProvider
+                    .builder()
+                    .turn {
+                        textDelta("Hi")
+                        tokenUsage(100, 50)
+                        done()
+                    }.build()
+            val (delegate, deps) = makeDelegate(llm)
+            delegate.run(reasoning, ctx("turn42"), LoopConfig(maxIterations = 3))
+            val result = deps.costGuard.checkAllowed("other-turn")
+            assertEquals(com.hebe.core.cost.CostGuard.CheckResult.Allow, result)
+        }
+
+    @Test
+    fun `run stops at max iterations`() =
+        runTest {
+            // Text responses always FinishWith, so we need tool calls to keep looping.
+            val builder = MockLlmProvider.builder()
+            repeat(5) {
+                builder.turn {
+                    toolCall("call_id", "echo", emptyMap())
                     done()
-                }.build()
-        val (delegate, _) = makeDelegate(llm)
-        val result = delegate.run(reasoning, ctx(), LoopConfig(maxIterations = 5))
-        assertEquals(LoopOutcome.Response("Hello!"), result)
-    }
+                }
+            }
+            val llm = builder.build()
+            val (delegate, deps) = makeDelegate(llm)
+            coEvery { deps.dispatcher.dispatch(any(), any()) } returns
+                com.hebe.tools.dispatch.DispatchOutcome.Result(
+                    com.hebe.api.ToolResult
+                        .Ok(kotlinx.serialization.json.JsonPrimitive("ok")),
+                )
+            val result = delegate.run(reasoning, ctx(), LoopConfig(maxIterations = 3))
+            assertEquals(LoopOutcome.MaxIterations, result)
+        }
 
     @Test
-    fun `run records cost after LLM call`() = runTest {
-        val llm =
-            MockLlmProvider
-                .builder()
-                .turn {
-                    textDelta("Hi")
-                    tokenUsage(100, 50)
-                    done()
-                }.build()
-        val (delegate, deps) = makeDelegate(llm)
-        delegate.run(reasoning, ctx("turn42"), LoopConfig(maxIterations = 3))
-        val result = deps.costGuard.checkAllowed("other-turn")
-        assertEquals(com.hebe.core.cost.CostGuard.CheckResult.Allow, result)
-    }
+    fun `beforeLlmCall denies when daily budget exceeded`() =
+        runTest {
+            val llm = MockLlmProvider.builder().build()
+            val (delegate, deps) = makeDelegate(llm, dailyCap = 0.000001)
+            deps.costGuard.recordCall("prev", "m", 100, 100, 1_000_000L)
+            val result = delegate.run(reasoning, ctx(), LoopConfig(maxIterations = 3))
+            assertTrue(result is LoopOutcome.Failure)
+            assertTrue((result as LoopOutcome.Failure).message.contains("budget"))
+        }
 
     @Test
-    fun `run stops at max iterations`() = runTest {
-        // Text responses always FinishWith, so we need tool calls to keep looping.
-        val builder = MockLlmProvider.builder()
-        repeat(5) { builder.turn { toolCall("call_id", "echo", emptyMap()); done() } }
-        val llm = builder.build()
-        val (delegate, deps) = makeDelegate(llm)
-        coEvery { deps.dispatcher.dispatch(any(), any()) } returns
-            com.hebe.tools.dispatch.DispatchOutcome.Result(
-                com.hebe.api.ToolResult.Ok(kotlinx.serialization.json.JsonPrimitive("ok")),
-            )
-        val result = delegate.run(reasoning, ctx(), LoopConfig(maxIterations = 3))
-        assertEquals(LoopOutcome.MaxIterations, result)
-    }
-
-    @Test
-    fun `beforeLlmCall denies when daily budget exceeded`() = runTest {
-        val llm = MockLlmProvider.builder().build()
-        val (delegate, deps) = makeDelegate(llm, dailyCap = 0.000001)
-        deps.costGuard.recordCall("prev", "m", 100, 100, 1_000_000L)
-        val result = delegate.run(reasoning, ctx(), LoopConfig(maxIterations = 3))
-        assertTrue(result is LoopOutcome.Failure)
-        assertTrue((result as LoopOutcome.Failure).message.contains("budget"))
-    }
-
-    @Test
-    fun `compacted history is used in next callLlm`() = runTest {
-        val llm =
-            MockLlmProvider
-                .builder()
-                .turn {
-                    textDelta("compacted response")
-                    done()
-                }.build()
-        val (delegate, deps) = makeDelegate(llm)
-        val compactedMsg =
-            ConversationMessage(
-                id = UUID.randomUUID(),
-                role = ChatRole.User,
-                content = "compacted",
-                toolCalls = emptyList(),
-                ts = Clock.System.now(),
-            )
-        coEvery { deps.memory.loadContext(any()) } returns listOf(compactedMsg)
-        val result = delegate.run(reasoning, ctx(), LoopConfig(maxIterations = 2))
-        assertEquals(LoopOutcome.Response("compacted response"), result)
-    }
+    fun `compacted history is used in next callLlm`() =
+        runTest {
+            val llm =
+                MockLlmProvider
+                    .builder()
+                    .turn {
+                        textDelta("compacted response")
+                        done()
+                    }.build()
+            val (delegate, deps) = makeDelegate(llm)
+            val compactedMsg =
+                ConversationMessage(
+                    id = UUID.randomUUID(),
+                    role = ChatRole.User,
+                    content = "compacted",
+                    toolCalls = emptyList(),
+                    ts = Clock.System.now(),
+                )
+            coEvery { deps.memory.loadContext(any()) } returns listOf(compactedMsg)
+            val result = delegate.run(reasoning, ctx(), LoopConfig(maxIterations = 2))
+            assertEquals(LoopOutcome.Response("compacted response"), result)
+        }
 }

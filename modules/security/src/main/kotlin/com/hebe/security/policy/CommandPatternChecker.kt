@@ -1,13 +1,14 @@
 package com.hebe.security.policy
 
 class CommandPatternChecker {
-    private val dangerousPatterns = listOf(
-        CommandSubstitutionChecker,
-        PipeToShellChecker,
-        NetworkExfilChecker,
-        VariableSubstitutionChecker,
-        RmRfChecker,
-    )
+    private val dangerousPatterns =
+        listOf(
+            CommandSubstitutionChecker,
+            PipeToShellChecker,
+            NetworkExfilChecker,
+            VariableSubstitutionChecker,
+            RmRfChecker,
+        )
 
     fun check(cmd: String): PatternCheckResult {
         for (checker in dangerousPatterns) {
@@ -51,28 +52,27 @@ class CommandPatternChecker {
     object PipeToShellChecker : DangerousChecker {
         private val pipeToShellPattern = Regex("\\|\\s*(bash|sh|python|ruby|perl|lua|php|node)")
 
-        override fun matches(cmd: String): Pair<Severity, String>? {
-            return if (pipeToShellPattern.containsMatchIn(cmd)) {
+        override fun matches(cmd: String): Pair<Severity, String>? =
+            if (pipeToShellPattern.containsMatchIn(cmd)) {
                 Pair(Severity.High, "Pipe to shell detected")
             } else {
                 null
             }
-        }
     }
 
     object NetworkExfilChecker : DangerousChecker {
-        private val exfilPatterns = listOf(
-            Regex("cat\\s+/etc/passwd\\s*\\|"),
-            Regex("cat\\s+/etc/shadow\\s*\\|"),
-            Regex("env\\s*\\|"),
-            Regex("printenv\\s*\\|"),
-        )
+        private val exfilPatterns =
+            listOf(
+                Regex("cat\\s+/etc/passwd\\s*\\|"),
+                Regex("cat\\s+/etc/shadow\\s*\\|"),
+                Regex("env\\s*\\|"),
+                Regex("printenv\\s*\\|"),
+            )
 
-        override fun matches(cmd: String): Pair<Severity, String>? {
-            return exfilPatterns.firstOrNull { it.containsMatchIn(cmd) }?.let {
+        override fun matches(cmd: String): Pair<Severity, String>? =
+            exfilPatterns.firstOrNull { it.containsMatchIn(cmd) }?.let {
                 Pair(Severity.High, "Potential network exfiltration detected")
             }
-        }
     }
 
     object VariableSubstitutionChecker : DangerousChecker {
@@ -93,12 +93,11 @@ class CommandPatternChecker {
     object RmRfChecker : DangerousChecker {
         private val rmRfPattern = Regex("rm\\s+(-[rf]+\\s+)*(/|\\*)")
 
-        override fun matches(cmd: String): Pair<Severity, String>? {
-            return if (rmRfPattern.containsMatchIn(cmd)) {
+        override fun matches(cmd: String): Pair<Severity, String>? =
+            if (rmRfPattern.containsMatchIn(cmd)) {
                 Pair(Severity.High, "Dangerous rm -rf pattern detected")
             } else {
                 null
             }
-        }
     }
 }

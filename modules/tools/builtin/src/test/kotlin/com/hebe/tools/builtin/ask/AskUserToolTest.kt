@@ -4,7 +4,6 @@ import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
 import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -18,9 +17,10 @@ class AskUserToolTest {
         val tool = AskUserTool()
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("question", JsonPrimitive("What is your name?")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("question", JsonPrimitive("What is your name?")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.NeedsApproval)
         assertEquals("What is your name?", (result as ToolResult.NeedsApproval).prompt)
@@ -31,15 +31,16 @@ class AskUserToolTest {
         val tool = AskUserTool()
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(
-                buildJsonObject {
-                    put("question", JsonPrimitive("Enter your API key"))
-                    put("purpose", JsonPrimitive("credential"))
-                },
-                ctx,
-            )
-        }
+        val result =
+            runBlocking {
+                tool.invoke(
+                    buildJsonObject {
+                        put("question", JsonPrimitive("Enter your API key"))
+                        put("purpose", JsonPrimitive("credential"))
+                    },
+                    ctx,
+                )
+            }
 
         assertTrue(result is ToolResult.Err)
         assertTrue((result as ToolResult.Err).message.contains("secretName required"))
@@ -50,16 +51,17 @@ class AskUserToolTest {
         val tool = AskUserTool()
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(
-                buildJsonObject {
-                    put("question", JsonPrimitive("Enter your API key"))
-                    put("purpose", JsonPrimitive("credential"))
-                    put("secretName", JsonPrimitive("my_api_key"))
-                },
-                ctx,
-            )
-        }
+        val result =
+            runBlocking {
+                tool.invoke(
+                    buildJsonObject {
+                        put("question", JsonPrimitive("Enter your API key"))
+                        put("purpose", JsonPrimitive("credential"))
+                        put("secretName", JsonPrimitive("my_api_key"))
+                    },
+                    ctx,
+                )
+            }
 
         assertTrue(result is ToolResult.NeedsApproval)
         val na = result as ToolResult.NeedsApproval

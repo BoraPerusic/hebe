@@ -13,7 +13,10 @@ object SigningKey {
     private const val PRIVATE_KEY_NAME = "receipts.signing_key"
 
     init {
-        Security.addProvider(org.bouncycastle.jce.provider.BouncyCastleProvider())
+        Security.addProvider(
+            org.bouncycastle.jce.provider
+                .BouncyCastleProvider(),
+        )
     }
 
     suspend fun bootstrap(secretStore: SecretStoreProvider): Ed25519PrivateKey {
@@ -46,9 +49,10 @@ class Ed25519PrivateKey(
 
     fun sign(message: ByteArray): ByteArray {
         val keyFactory = KeyFactory.getInstance("EdDSA", "BC")
-        val privateKey = keyFactory.generatePrivate(
-            java.security.spec.EdECPrivateKeySpec(NamedParameterSpec("Ed25519"), seed)
-        )
+        val privateKey =
+            keyFactory.generatePrivate(
+                java.security.spec.EdECPrivateKeySpec(NamedParameterSpec("Ed25519"), seed),
+            )
         val signature = java.security.Signature.getInstance("EdDSA", "BC")
         signature.initSign(privateKey)
         signature.update(message)
@@ -78,8 +82,12 @@ class Ed25519PrivateKey(
 }
 
 object Ed25519Verifier {
-    fun verify(publicKeyBytes: ByteArray, message: ByteArray, signature: ByteArray): Boolean {
-        return try {
+    fun verify(
+        publicKeyBytes: ByteArray,
+        message: ByteArray,
+        signature: ByteArray,
+    ): Boolean =
+        try {
             val keyFactory = KeyFactory.getInstance("EdDSA", "BC")
             val publicKey = keyFactory.generatePublic(java.security.spec.X509EncodedKeySpec(publicKeyBytes))
             val sig = java.security.Signature.getInstance("EdDSA", "BC")
@@ -89,5 +97,4 @@ object Ed25519Verifier {
         } catch (e: Exception) {
             false
         }
-    }
 }

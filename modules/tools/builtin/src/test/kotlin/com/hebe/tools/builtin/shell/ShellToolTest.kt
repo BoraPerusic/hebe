@@ -2,25 +2,25 @@ package com.hebe.tools.builtin.shell
 
 import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
-import com.hebe.memory.workspace.WorkspaceFs
-import io.mockk.every
 import io.mockk.mockk
+import java.nio.file.Path
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.nio.file.Path
-import kotlinx.coroutines.runBlocking
 
 class ShellToolTest {
     @Test
-    fun `shell echo hello returns Ok`(@TempDir tempDir: Path) {
+    fun `shell echo hello returns Ok`(
+        @TempDir tempDir: Path,
+    ) {
         val tool = ShellTool(tempDir, null)
 
-        val args = buildJsonObject {
-            put("cmd", kotlinx.serialization.json.JsonPrimitive("echo hello"))
-        }
+        val args =
+            buildJsonObject {
+                put("cmd", kotlinx.serialization.json.JsonPrimitive("echo hello"))
+            }
         val ctx = mockk<ToolContext>()
 
         val result = runBlocking { tool.invoke(args, ctx) }
@@ -31,7 +31,9 @@ class ShellToolTest {
     }
 
     @Test
-    fun `shell missing cmd returns Err`(@TempDir tempDir: Path) {
+    fun `shell missing cmd returns Err`(
+        @TempDir tempDir: Path,
+    ) {
         val tool = ShellTool(tempDir, null)
 
         val args = buildJsonObject { }
@@ -44,12 +46,15 @@ class ShellToolTest {
     }
 
     @Test
-    fun `shell non-zero exit returns Err`(@TempDir tempDir: Path) {
+    fun `shell non-zero exit returns Err`(
+        @TempDir tempDir: Path,
+    ) {
         val tool = ShellTool(tempDir, null)
 
-        val args = buildJsonObject {
-            put("cmd", kotlinx.serialization.json.JsonPrimitive("exit 1"))
-        }
+        val args =
+            buildJsonObject {
+                put("cmd", kotlinx.serialization.json.JsonPrimitive("exit 1"))
+            }
         val ctx = mockk<ToolContext>()
 
         val result = runBlocking { tool.invoke(args, ctx) }
@@ -59,13 +64,16 @@ class ShellToolTest {
     }
 
     @Test
-    fun `shell timeout returns Err`(@TempDir tempDir: Path) {
+    fun `shell timeout returns Err`(
+        @TempDir tempDir: Path,
+    ) {
         val tool = ShellTool(tempDir, null)
 
-        val args = buildJsonObject {
-            put("cmd", kotlinx.serialization.json.JsonPrimitive("sleep 10"))
-            put("timeout_ms", kotlinx.serialization.json.JsonPrimitive(100))
-        }
+        val args =
+            buildJsonObject {
+                put("cmd", kotlinx.serialization.json.JsonPrimitive("sleep 10"))
+                put("timeout_ms", kotlinx.serialization.json.JsonPrimitive(100))
+            }
         val ctx = mockk<ToolContext>()
 
         val result = runBlocking { tool.invoke(args, ctx) }

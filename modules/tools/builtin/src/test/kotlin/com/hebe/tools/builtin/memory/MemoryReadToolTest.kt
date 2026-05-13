@@ -19,9 +19,10 @@ class MemoryReadToolTest {
         val tool = MemoryReadTool(memory)
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("path", JsonPrimitive("docs/overview")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("path", JsonPrimitive("docs/overview")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Ok)
         assertTrue((result as ToolResult.Ok).content.toString().contains("Overview"))
@@ -34,9 +35,10 @@ class MemoryReadToolTest {
         val tool = MemoryReadTool(memory)
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("path", JsonPrimitive("missing/doc")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("path", JsonPrimitive("missing/doc")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Err)
         assertTrue((result as ToolResult.Err).message.contains("not found"))

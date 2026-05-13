@@ -6,9 +6,7 @@ import java.nio.file.Path
 object EstopIpc {
     private const val SOCKET_NAME = ".estop.sock"
 
-    fun getSocketPath(dataDir: Path): Path {
-        return dataDir.resolve(SOCKET_NAME)
-    }
+    fun getSocketPath(dataDir: Path): Path = dataDir.resolve(SOCKET_NAME)
 
     fun sendStop(socketPath: Path): Boolean {
         return try {
@@ -29,16 +27,25 @@ object EstopIpc {
         }
     }
 
-    fun startServer(socketPath: Path, onStop: () -> Unit) {
+    fun startServer(
+        socketPath: Path,
+        onStop: () -> Unit,
+    ) {
         val server = ServerSocketChannel.open(java.net.StandardProtocolFamily.UNIX)
         try {
-            java.nio.file.Files.deleteIfExists(socketPath)
+            java.nio.file.Files
+                .deleteIfExists(socketPath)
             server.bind(java.net.UnixDomainSocketAddress.of(socketPath))
             while (true) {
                 try {
                     val socket = server.accept()
                     socket.use { s ->
-                        val data = s.socket().getInputStream().readBytes().toString(Charsets.UTF_8)
+                        val data =
+                            s
+                                .socket()
+                                .getInputStream()
+                                .readBytes()
+                                .toString(Charsets.UTF_8)
                         if (data.trim() == "STOP") {
                             onStop()
                             s.socket().getOutputStream().use { out ->

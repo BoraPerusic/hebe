@@ -28,16 +28,17 @@ interface DispatchValidator {
 
 fun Validator.toDispatchValidator(): DispatchValidator = DispatchValidatorImpl(this)
 
-private class DispatchValidatorImpl(val validator: Validator) : DispatchValidator {
+private class DispatchValidatorImpl(
+    val validator: Validator,
+) : DispatchValidator {
     override suspend fun validate(
         call: ParsedToolCall,
         tool: Tool,
         ctx: ToolContext,
-    ): DispatchValidationResult {
-        return when (val result = validator.validate(call, tool, ctx)) {
+    ): DispatchValidationResult =
+        when (val result = validator.validate(call, tool, ctx)) {
             is ValidationResult.Allow -> DispatchValidationResult.Allow
             is ValidationResult.RequireApproval -> DispatchValidationResult.RequireApproval(result.prompt)
             is ValidationResult.Deny -> DispatchValidationResult.Deny(result.reason)
         }
-    }
 }

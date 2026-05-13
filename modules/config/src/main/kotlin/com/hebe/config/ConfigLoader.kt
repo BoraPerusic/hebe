@@ -141,7 +141,8 @@ class ConfigLoader {
         val levelStr = table.getString("level") ?: "Supervised"
         val level =
             try {
-                com.hebe.api.AutonomyLevel.valueOf(levelStr.replaceFirstChar { it.uppercase() })
+                com.hebe.api.AutonomyLevel
+                    .valueOf(levelStr.replaceFirstChar { it.uppercase() })
             } catch (_: Exception) {
                 com.hebe.api.AutonomyLevel.Supervised
             }

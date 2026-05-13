@@ -12,14 +12,18 @@ class DuckDuckGoSearchProvider : WebSearchProvider {
 
     override val name = "duckduckgo"
 
-    override suspend fun search(query: String, k: Int): List<SearchHit> {
+    override suspend fun search(
+        query: String,
+        k: Int,
+    ): List<SearchHit> {
         logger.debug("ddg search query={} k={}", query, k)
         return try {
-            val resp = client.get("https://html.duckduckgo.com/html") {
-                url {
-                    parameters.append("q", query)
+            val resp =
+                client.get("https://html.duckduckgo.com/html") {
+                    url {
+                        parameters.append("q", query)
+                    }
                 }
-            }
             val body = resp.bodyAsText()
             parseDdgoResponse(body, k)
         } catch (e: Exception) {
@@ -28,7 +32,10 @@ class DuckDuckGoSearchProvider : WebSearchProvider {
         }
     }
 
-    private fun parseDdgoResponse(html: String, k: Int): List<SearchHit> {
+    private fun parseDdgoResponse(
+        html: String,
+        k: Int,
+    ): List<SearchHit> {
         val results = mutableListOf<SearchHit>()
         val resultRegex = Regex("""<a class="result__a" href="([^"]+)">([^<]+)</a>""")
         val snippetRegex = Regex("""<a class="result__snippet"[^>]*>([^<]+)</a>""")

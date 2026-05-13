@@ -20,9 +20,12 @@ object SqliteVecExtension {
         return if (url.protocol == "file") {
             File(url.toURI())
         } else {
-            val tmpDir = java.nio.file.Files.createTempDirectory("sqlite-vec")
+            val tmpDir =
+                java.nio.file.Files
+                    .createTempDirectory("sqlite-vec")
             val file = tmpDir.resolve(libName)
-            java.nio.file.Files.copy(url.openStream(), file)
+            java.nio.file.Files
+                .copy(url.openStream(), file)
             file.toFile().setExecutable(true)
             file.toFile()
         }

@@ -2,13 +2,13 @@ package com.hebe.security.estop
 
 import com.hebe.api.PartialReceipt
 import com.hebe.api.Receipts
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import org.slf4j.LoggerFactory
-import java.util.concurrent.atomic.AtomicBoolean
 
 class EmergencyStop(
     private val scope: CoroutineScope,
@@ -21,9 +21,10 @@ class EmergencyStop(
     val isStopRequested: Boolean
         get() = stopFlag.get()
 
-    fun stopFlow(): Flow<Unit> = flow {
-        stopChannel.receive()
-    }
+    fun stopFlow(): Flow<Unit> =
+        flow {
+            stopChannel.receive()
+        }
 
     suspend fun requestStop() {
         logger.warn("Emergency stop requested")

@@ -49,15 +49,16 @@ class DomainAllowlistValidator(
         }
     }
 
-    private fun extractHost(url: String): String {
-        return try {
+    private fun extractHost(url: String): String =
+        try {
             java.net.URL(url).host
         } catch (e: Exception) {
             ""
         }
-    }
 
-    private class DomainPattern(pattern: String) {
+    private class DomainPattern(
+        pattern: String,
+    ) {
         private val isWildcard = pattern.startsWith("*.")
         private val domainPart = if (isWildcard) pattern.drop(2).lowercase() else pattern.lowercase()
 

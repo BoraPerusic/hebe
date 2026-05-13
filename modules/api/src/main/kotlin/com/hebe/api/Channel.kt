@@ -48,6 +48,7 @@ data class IncomingMessage(
     val isInternal: Boolean = false,
     val isAgentBroadcast: Boolean = false,
     val triggeringMissionId: String? = null,
+    val sessionId: String? = null,
 )
 
 @Serializable

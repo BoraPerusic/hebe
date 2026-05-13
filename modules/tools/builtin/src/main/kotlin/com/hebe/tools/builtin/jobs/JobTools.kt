@@ -15,43 +15,56 @@ import org.slf4j.LoggerFactory
 class JobCreateTool : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    override val spec = ToolSpec(
-        name = "job_create",
-        description = "Create an ad-hoc or maintenance job. Risk: Low.",
-        schema = buildJsonObject {
-            put("type", JsonPrimitive("object"))
-            put("required", buildJsonArray { add(JsonPrimitive("kind")); add(JsonPrimitive("payload")) })
-            put(
-                "properties",
+    override val spec =
+        ToolSpec(
+            name = "job_create",
+            description = "Create an ad-hoc or maintenance job. Risk: Low.",
+            schema =
                 buildJsonObject {
+                    put("type", JsonPrimitive("object"))
                     put(
-                        "kind",
-                        buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Job kind: adhoc | routine | maintenance | heartbeat"))
+                        "required",
+                        buildJsonArray {
+                            add(JsonPrimitive("kind"))
+                            add(JsonPrimitive("payload"))
                         },
                     )
                     put(
-                        "payload",
+                        "properties",
                         buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Job payload as JSON string"))
+                            put(
+                                "kind",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Job kind: adhoc | routine | maintenance | heartbeat"))
+                                },
+                            )
+                            put(
+                                "payload",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Job payload as JSON string"))
+                                },
+                            )
                         },
                     )
                 },
-            )
-        },
-        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
-    )
+            pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+        )
 
     override val risk = RiskLevel.Low
     override val readOnly = false
 
-    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
-        val kind = args["kind"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: kind")
-        val payload = args["payload"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: payload")
+    override suspend fun invoke(
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolResult {
+        val kind =
+            args["kind"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: kind")
+        val payload =
+            args["payload"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: payload")
 
         val validKinds = setOf("adhoc", "routine", "maintenance", "heartbeat")
         if (kind !in validKinds) {
@@ -62,87 +75,111 @@ class JobCreateTool : Tool {
         logger.debug("job_create kind={} id={}", kind, id)
 
         // stub: pending M8.T2 for DB persistence
-        return ToolResult.Ok(buildJsonObject {
-            put("id", JsonPrimitive(id))
-            put("kind", JsonPrimitive(kind))
-            put("status", JsonPrimitive("pending"))
-        })
+        return ToolResult.Ok(
+            buildJsonObject {
+                put("id", JsonPrimitive(id))
+                put("kind", JsonPrimitive(kind))
+                put("status", JsonPrimitive("pending"))
+            },
+        )
     }
 }
 
 class JobStatusTool : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    override val spec = ToolSpec(
-        name = "job_status",
-        description = "Get status of a job by ID. Risk: Low, read-only.",
-        schema = buildJsonObject {
-            put("type", JsonPrimitive("object"))
-            put("required", buildJsonArray { add(JsonPrimitive("id")) })
-            put(
-                "properties",
+    override val spec =
+        ToolSpec(
+            name = "job_status",
+            description = "Get status of a job by ID. Risk: Low, read-only.",
+            schema =
                 buildJsonObject {
-                    put("id", buildJsonObject {
-                        put("type", JsonPrimitive("string"))
-                        put("description", JsonPrimitive("Job ID"))
-                    })
+                    put("type", JsonPrimitive("object"))
+                    put("required", buildJsonArray { add(JsonPrimitive("id")) })
+                    put(
+                        "properties",
+                        buildJsonObject {
+                            put(
+                                "id",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Job ID"))
+                                },
+                            )
+                        },
+                    )
                 },
-            )
-        },
-        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
-    )
+            pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+        )
 
     override val risk = RiskLevel.Low
     override val readOnly = true
 
-    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
-        val id = args["id"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: id")
+    override suspend fun invoke(
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolResult {
+        val id =
+            args["id"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: id")
 
         logger.debug("job_status id={}", id)
 
         // stub: pending M8.T2 for DB persistence
-        return ToolResult.Ok(buildJsonObject {
-            put("id", JsonPrimitive(id))
-            put("status", JsonPrimitive("pending"))
-        })
+        return ToolResult.Ok(
+            buildJsonObject {
+                put("id", JsonPrimitive(id))
+                put("status", JsonPrimitive("pending"))
+            },
+        )
     }
 }
 
 class JobCancelTool : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    override val spec = ToolSpec(
-        name = "job_cancel",
-        description = "Cancel a pending or running job. Risk: Medium.",
-        schema = buildJsonObject {
-            put("type", JsonPrimitive("object"))
-            put("required", buildJsonArray { add(JsonPrimitive("id")) })
-            put(
-                "properties",
+    override val spec =
+        ToolSpec(
+            name = "job_cancel",
+            description = "Cancel a pending or running job. Risk: Medium.",
+            schema =
                 buildJsonObject {
-                    put("id", buildJsonObject {
-                        put("type", JsonPrimitive("string"))
-                        put("description", JsonPrimitive("Job ID to cancel"))
-                    })
+                    put("type", JsonPrimitive("object"))
+                    put("required", buildJsonArray { add(JsonPrimitive("id")) })
+                    put(
+                        "properties",
+                        buildJsonObject {
+                            put(
+                                "id",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Job ID to cancel"))
+                                },
+                            )
+                        },
+                    )
                 },
-            )
-        },
-        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
-    )
+            pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+        )
 
     override val risk = RiskLevel.Medium
     override val readOnly = false
 
-    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
-        val id = args["id"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: id")
+    override suspend fun invoke(
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolResult {
+        val id =
+            args["id"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: id")
 
         logger.debug("job_cancel id={}", id)
 
-        return ToolResult.Ok(buildJsonObject {
-            put("id", JsonPrimitive(id))
-            put("status", JsonPrimitive("cancelled"))
-        })
+        return ToolResult.Ok(
+            buildJsonObject {
+                put("id", JsonPrimitive(id))
+                put("status", JsonPrimitive("cancelled"))
+            },
+        )
     }
 }

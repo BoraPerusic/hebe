@@ -5,70 +5,87 @@ import com.hebe.api.Tool
 import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
 import com.hebe.api.ToolSpec
+import java.nio.file.Path
+import java.util.concurrent.TimeUnit
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
-import java.nio.file.Path
-import java.util.concurrent.TimeUnit
 
 class KubectlTool(
     private val workspaceRoot: Path,
 ) : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    private val MUTATING_VERBS = setOf(
-        "apply", "create", "delete", "patch", "replace",
-        "scale", "rollout", "cordon", "drain", "uncordon",
-        "taint", "label", "annotate", "exec", "port-forward",
-        "set", "edit",
-    )
+    private val MUTATING_VERBS =
+        setOf(
+            "apply",
+            "create",
+            "delete",
+            "patch",
+            "replace",
+            "scale",
+            "rollout",
+            "cordon",
+            "drain",
+            "uncordon",
+            "taint",
+            "label",
+            "annotate",
+            "exec",
+            "port-forward",
+            "set",
+            "edit",
+        )
 
-    override val spec = ToolSpec(
-        name = "kubectl",
-        description = "Run kubectl commands. Read-only verbs are Medium risk. " +
-            "Mutating verbs are High risk and always require approval.",
-        schema = buildJsonObject {
-            put("type", JsonPrimitive("object"))
-            put("required", buildJsonArray { add(JsonPrimitive("verb")) })
-            put(
-                "properties",
+    override val spec =
+        ToolSpec(
+            name = "kubectl",
+            description =
+                "Run kubectl commands. Read-only verbs are Medium risk. " +
+                    "Mutating verbs are High risk and always require approval.",
+            schema =
                 buildJsonObject {
+                    put("type", JsonPrimitive("object"))
+                    put("required", buildJsonArray { add(JsonPrimitive("verb")) })
                     put(
-                        "verb",
+                        "properties",
                         buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("kubectl verb (get, describe, apply, delete, etc.)"))
-                        },
-                    )
-                    put(
-                        "args",
-                        buildJsonObject {
-                            put("type", JsonPrimitive("array"))
-                            put("description", JsonPrimitive("Additional kubectl arguments"))
-                        },
-                    )
-                    put(
-                        "kubeconfig",
-                        buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Optional path to kubeconfig file"))
-                        },
-                    )
-                    put(
-                        "context",
-                        buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Optional kubeconfig context"))
+                            put(
+                                "verb",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("kubectl verb (get, describe, apply, delete, etc.)"))
+                                },
+                            )
+                            put(
+                                "args",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("array"))
+                                    put("description", JsonPrimitive("Additional kubectl arguments"))
+                                },
+                            )
+                            put(
+                                "kubeconfig",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Optional path to kubeconfig file"))
+                                },
+                            )
+                            put(
+                                "context",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Optional kubeconfig context"))
+                                },
+                            )
                         },
                     )
                 },
-            )
-        },
-        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
-    )
+            pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+        )
 
     override val risk = RiskLevel.Medium
 
@@ -79,14 +96,21 @@ class KubectlTool(
         return verb in MUTATING_VERBS
     }
 
-    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
-        val verb = args["verb"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: verb")
-        val extraArgsArr = args["args"]?.let { arg ->
-            if (arg is kotlinx.serialization.json.JsonArray) {
-                arg.mapNotNull { it.jsonPrimitive?.content }
-            } else null
-        } ?: emptyList()
+    override suspend fun invoke(
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolResult {
+        val verb =
+            args["verb"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: verb")
+        val extraArgsArr =
+            args["args"]?.let { arg ->
+                if (arg is kotlinx.serialization.json.JsonArray) {
+                    arg.mapNotNull { it.jsonPrimitive?.content }
+                } else {
+                    null
+                }
+            } ?: emptyList()
         val kubeconfig = args["kubeconfig"]?.jsonPrimitive?.content
         val context = args["context"]?.jsonPrimitive?.content
 
@@ -106,7 +130,10 @@ class KubectlTool(
             val completed = process.waitFor(120, TimeUnit.SECONDS)
             if (!completed) {
                 process.destroy()
-                try { Thread.sleep(1000) } catch (_: Exception) { }
+                try {
+                    Thread.sleep(1000)
+                } catch (_: Exception) {
+                }
                 if (process.isAlive) process.destroyForcibly()
                 return ToolResult.Err("timeout after 120s")
             }

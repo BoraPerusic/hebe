@@ -22,9 +22,10 @@ class MemoryTreeToolTest {
         val tool = MemoryTreeTool(memory)
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("prefix", JsonPrimitive("docs")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("prefix", JsonPrimitive("docs")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Ok)
         val arr = (result as ToolResult.Ok).content as JsonArray

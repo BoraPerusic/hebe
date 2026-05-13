@@ -1,13 +1,13 @@
 package com.hebe.core.e2e
 
 import com.hebe.api.Channel
-import com.hebe.api.ConversationMessage
+import com.hebe.api.LeakDetector
 import com.hebe.api.LoopConfig
 import com.hebe.api.LoopOutcome
 import com.hebe.api.MemoryStore
 import com.hebe.api.Observer
-import com.hebe.api.ParsedToolCall
 import com.hebe.api.ProviderCapabilities
+import com.hebe.api.Receipts
 import com.hebe.api.RiskLevel
 import com.hebe.api.Span
 import com.hebe.api.Tool
@@ -24,22 +24,17 @@ import com.hebe.memory.db.DbFactory
 import com.hebe.providers.openai.MockLlmProvider
 import com.hebe.security.approval.ApprovalGate
 import com.hebe.security.approval.PendingApprovalsRepo
-import com.hebe.tools.dispatch.LeakDetector
-import com.hebe.tools.dispatch.Receipts
 import com.hebe.tools.dispatch.ToolDispatcher
 import com.hebe.tools.dispatch.ToolRegistry
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
-import java.util.UUID
-import kotlin.time.Clock
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
@@ -72,7 +67,9 @@ class AgentLoopE2ETest {
             override val turnId = turnId
             override val userId = "u1"
             override val requestor = mockk<Channel> { every { name } returns "cli" }
-            override val workspace = com.hebe.api.workspace.WorkspacePath(".")
+            override val workspace =
+                com.hebe.api.workspace
+                    .WorkspacePath(".")
             override val approvalGate = mockk<com.hebe.api.ApprovalGate>(relaxed = true)
             override val observer = this@AgentLoopE2ETest.observer
             override val secretLookup = mockk<com.hebe.api.SecretLookup>(relaxed = true)
@@ -120,7 +117,10 @@ class AgentLoopE2ETest {
                     approvalGate = approvalGate,
                     memory = memory,
                     observer = observer,
-                    leakDetector = object : LeakDetector { override fun scan(result: ToolResult) = result },
+                    leakDetector =
+                        object : LeakDetector {
+                            override fun scan(result: ToolResult) = result
+                        },
                     receipts = receipts,
                 )
 

@@ -1,12 +1,11 @@
 package com.hebe.security.policy
 
-import com.hebe.api.PathScope
 import com.hebe.api.ParsedToolCall
+import com.hebe.api.PathScope
 import com.hebe.api.Tool
 import com.hebe.api.ToolContext
 import com.hebe.api.ValidationResult
 import com.hebe.api.Validator
-import com.hebe.api.workspace.WorkspacePath
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -30,7 +29,7 @@ class WorkspaceBoundaryValidator(
 
             for (forbidden in forbiddenPathAbsolutes) {
                 if (normalized.toString().startsWith(forbidden.toString())) {
-                    return ValidationResult.Deny("Path $pathValue is in forbidden directory: ${forbidden.toString()}")
+                    return ValidationResult.Deny("Path $pathValue is in forbidden directory: $forbidden")
                 }
             }
 

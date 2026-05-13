@@ -2,13 +2,11 @@ package com.hebe.tools.builtin.http
 
 import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
-import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
-import kotlinx.coroutines.runBlocking
 
 class HttpToolTest {
     @Test
@@ -16,9 +14,10 @@ class HttpToolTest {
         val secretLookup = mockk<com.hebe.api.SecretLookup>()
         val tool = HttpTool(secretLookup)
 
-        val args = buildJsonObject {
-            put("url", kotlinx.serialization.json.JsonPrimitive("https://example.com"))
-        }
+        val args =
+            buildJsonObject {
+                put("url", kotlinx.serialization.json.JsonPrimitive("https://example.com"))
+            }
         val ctx = mockk<ToolContext>()
 
         val result = runBlocking { tool.invoke(args, ctx) }
@@ -32,9 +31,10 @@ class HttpToolTest {
         val secretLookup = mockk<com.hebe.api.SecretLookup>()
         val tool = HttpTool(secretLookup)
 
-        val args = buildJsonObject {
-            put("method", kotlinx.serialization.json.JsonPrimitive("GET"))
-        }
+        val args =
+            buildJsonObject {
+                put("method", kotlinx.serialization.json.JsonPrimitive("GET"))
+            }
         val ctx = mockk<ToolContext>()
 
         val result = runBlocking { tool.invoke(args, ctx) }
@@ -48,10 +48,11 @@ class HttpToolTest {
         val secretLookup = mockk<com.hebe.api.SecretLookup>()
         val tool = HttpTool(secretLookup)
 
-        val args = buildJsonObject {
-            put("method", kotlinx.serialization.json.JsonPrimitive("INVALID"))
-            put("url", kotlinx.serialization.json.JsonPrimitive("https://example.com"))
-        }
+        val args =
+            buildJsonObject {
+                put("method", kotlinx.serialization.json.JsonPrimitive("INVALID"))
+                put("url", kotlinx.serialization.json.JsonPrimitive("https://example.com"))
+            }
         val ctx = mockk<ToolContext>()
 
         val result = runBlocking { tool.invoke(args, ctx) }

@@ -18,24 +18,26 @@ class AutonomyValidator(
         call: ParsedToolCall,
         tool: Tool,
         ctx: ToolContext,
-    ): ValidationResult {
-        return when (level) {
+    ): ValidationResult =
+        when (level) {
             AutonomyLevel.ReadOnly -> {
                 if (tool.readOnly) ValidationResult.Allow else ValidationResult.Deny("ReadOnly mode blocks side-effect tools")
             }
             AutonomyLevel.Supervised -> {
                 when {
                     tool.risk == RiskLevel.Low -> ValidationResult.Allow
-                    else -> ValidationResult.RequireApproval(
-                        "Supervised mode requires approval for ${tool.risk.name} risk tool: ${tool.spec.name}",
-                    )
+                    else ->
+                        ValidationResult.RequireApproval(
+                            "Supervised mode requires approval for ${tool.risk.name} risk tool: ${tool.spec.name}",
+                        )
                 }
             }
             AutonomyLevel.Full -> {
                 when (tool.risk) {
                     RiskLevel.Low -> ValidationResult.Allow
                     RiskLevel.Medium,
-                    RiskLevel.High -> {
+                    RiskLevel.High,
+                    -> {
                         if (tool.effectiveRequiresApproval(call.args)) {
                             ValidationResult.RequireApproval(
                                 "${tool.risk.name}-risk tool ${tool.spec.name} requires approval",
@@ -51,5 +53,4 @@ class AutonomyValidator(
                 ValidationResult.Allow
             }
         }
-    }
 }

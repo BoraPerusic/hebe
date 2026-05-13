@@ -19,45 +19,51 @@ class FileSystemListTool(
 ) : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    override val spec = ToolSpec(
-        name = "file_system_list",
-        description = "List files in the workspace.",
-        schema = buildJsonObject {
-            put("type", JsonPrimitive("object"))
-            put(
-                "properties",
+    override val spec =
+        ToolSpec(
+            name = "file_system_list",
+            description = "List files in the workspace.",
+            schema =
                 buildJsonObject {
+                    put("type", JsonPrimitive("object"))
                     put(
-                        "prefix",
+                        "properties",
                         buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Workspace-relative prefix (default: empty = root)"))
-                            put("default", JsonPrimitive(""))
+                            put(
+                                "prefix",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Workspace-relative prefix (default: empty = root)"))
+                                    put("default", JsonPrimitive(""))
+                                },
+                            )
                         },
                     )
                 },
-            )
-        },
-        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
-    )
+            pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+        )
 
     override val risk = RiskLevel.Low
     override val readOnly = true
 
-    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
+    override suspend fun invoke(
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolResult {
         val prefixStr = args["prefix"]?.jsonPrimitive?.content ?: ""
         val prefix = WorkspacePath(prefixStr)
         logger.debug("listing workspace prefix: {}", prefix.value)
 
         val files = fs.list(prefix)
-        val items = files.map { wp ->
-            val metadata = fs.stat(wp) ?: WorkspaceFs.FileMetadata(0L, 0L)
-            buildJsonObject {
-                put("name", JsonPrimitive(wp.value))
-                put("size", JsonPrimitive(metadata.size))
-                put("modified", JsonPrimitive(metadata.modifiedMs))
+        val items =
+            files.map { wp ->
+                val metadata = fs.stat(wp) ?: WorkspaceFs.FileMetadata(0L, 0L)
+                buildJsonObject {
+                    put("name", JsonPrimitive(wp.value))
+                    put("size", JsonPrimitive(metadata.size))
+                    put("modified", JsonPrimitive(metadata.modifiedMs))
+                }
             }
-        }
         return ToolResult.Ok(buildJsonArray { items.forEach { add(it) } })
     }
 }

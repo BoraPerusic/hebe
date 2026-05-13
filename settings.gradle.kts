@@ -31,7 +31,7 @@ include(
     ":modules:tools:mcp-client",
     ":modules:core",
     ":modules:plugins",
-    ":modules:channels:api",
+    ":modules:channels:channel-manager",
     ":modules:channels:cli",
     ":modules:channels:web",
     ":modules:channels:telegram",

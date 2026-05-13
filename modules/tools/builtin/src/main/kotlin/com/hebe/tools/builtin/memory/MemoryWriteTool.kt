@@ -23,58 +23,72 @@ class MemoryWriteTool(
 ) : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    override val spec = ToolSpec(
-        name = "memory_write",
-        description = "Write a document to memory.",
-        schema = buildJsonObject {
-            put("type", JsonPrimitive("object"))
-            put("required", buildJsonArray { add(JsonPrimitive("path")); add(JsonPrimitive("content")) })
-            put(
-                "properties",
+    override val spec =
+        ToolSpec(
+            name = "memory_write",
+            description = "Write a document to memory.",
+            schema =
                 buildJsonObject {
+                    put("type", JsonPrimitive("object"))
                     put(
-                        "path",
-                        buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Document path"))
+                        "required",
+                        buildJsonArray {
+                            add(JsonPrimitive("path"))
+                            add(JsonPrimitive("content"))
                         },
                     )
                     put(
-                        "content",
+                        "properties",
                         buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Document content"))
-                        },
-                    )
-                    put(
-                        "category",
-                        buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Category: Document, Fact, Preference, Skill (default: Document)"))
-                            put("default", JsonPrimitive("Document"))
+                            put(
+                                "path",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Document path"))
+                                },
+                            )
+                            put(
+                                "content",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Document content"))
+                                },
+                            )
+                            put(
+                                "category",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Category: Document, Fact, Preference, Skill (default: Document)"))
+                                    put("default", JsonPrimitive("Document"))
+                                },
+                            )
                         },
                     )
                 },
-            )
-        },
-        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
-    )
+            pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+        )
 
     override val risk = RiskLevel.Medium
     override val readOnly = false
 
-    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
-        val path = args["path"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: path")
-        val content = args["content"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: content")
+    override suspend fun invoke(
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolResult {
+        val path =
+            args["path"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: path")
+        val content =
+            args["content"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: content")
         val categoryStr = args["category"]?.jsonPrimitive?.content ?: "Document"
 
-        val category = try {
-            MemoryCategory.valueOf(categoryStr)
-        } catch (_: Exception) {
-            MemoryCategory.Document
-        }
+        val category =
+            try {
+                MemoryCategory.valueOf(categoryStr)
+            } catch (_: Exception) {
+                MemoryCategory.Document
+            }
 
         logger.debug("memory_write path={} category={}", path, category)
 

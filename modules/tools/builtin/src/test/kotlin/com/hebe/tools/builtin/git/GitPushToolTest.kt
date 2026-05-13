@@ -4,17 +4,19 @@ import com.hebe.api.RiskLevel
 import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
 import io.mockk.mockk
+import java.nio.file.Path
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.nio.file.Path
 
 class GitPushToolTest {
     @Test
-    fun `push on non-git directory returns Err`(@TempDir tempDir: Path) {
+    fun `push on non-git directory returns Err`(
+        @TempDir tempDir: Path,
+    ) {
         val tool = GitPushTool(tempDir)
         val ctx = mockk<ToolContext>()
 
@@ -25,7 +27,9 @@ class GitPushToolTest {
     }
 
     @Test
-    fun `push has High risk`(@TempDir tempDir: Path) {
+    fun `push has High risk`(
+        @TempDir tempDir: Path,
+    ) {
         assertEquals(RiskLevel.High, GitPushTool(tempDir).risk)
     }
 }

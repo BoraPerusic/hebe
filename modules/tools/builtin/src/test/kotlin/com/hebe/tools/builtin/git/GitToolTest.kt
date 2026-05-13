@@ -3,18 +3,17 @@ package com.hebe.tools.builtin.git
 import com.hebe.api.ToolContext
 import com.hebe.api.ToolResult
 import io.mockk.mockk
+import java.nio.file.Files
+import java.nio.file.Path
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.eclipse.jgit.api.Git
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.nio.file.Files
-import java.nio.file.Path
 
 class GitToolTest {
     private fun initRepo(dir: Path): Git {
@@ -27,14 +26,17 @@ class GitToolTest {
     }
 
     @Test
-    fun `status on clean repo returns clean=true`(@TempDir tempDir: Path) {
+    fun `status on clean repo returns clean=true`(
+        @TempDir tempDir: Path,
+    ) {
         initRepo(tempDir)
         val tool = GitTool(tempDir)
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("verb", JsonPrimitive("status")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("verb", JsonPrimitive("status")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Ok)
         val obj = (result as ToolResult.Ok).content as JsonObject
@@ -42,15 +44,18 @@ class GitToolTest {
     }
 
     @Test
-    fun `status shows untracked file`(@TempDir tempDir: Path) {
+    fun `status shows untracked file`(
+        @TempDir tempDir: Path,
+    ) {
         initRepo(tempDir)
         Files.writeString(tempDir.resolve("untracked.txt"), "hello")
         val tool = GitTool(tempDir)
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("verb", JsonPrimitive("status")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("verb", JsonPrimitive("status")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Ok)
         val obj = (result as ToolResult.Ok).content.toString()
@@ -58,32 +63,38 @@ class GitToolTest {
     }
 
     @Test
-    fun `commit creates a log entry`(@TempDir tempDir: Path) {
+    fun `commit creates a log entry`(
+        @TempDir tempDir: Path,
+    ) {
         initRepo(tempDir)
         Files.writeString(tempDir.resolve("file.txt"), "content")
         val tool = GitTool(tempDir)
         val ctx = mockk<ToolContext>()
 
-        val commitResult = runBlocking {
-            tool.invoke(
-                buildJsonObject {
-                    put("verb", JsonPrimitive("commit"))
-                    put("message", JsonPrimitive("initial commit"))
-                },
-                ctx,
-            )
-        }
+        val commitResult =
+            runBlocking {
+                tool.invoke(
+                    buildJsonObject {
+                        put("verb", JsonPrimitive("commit"))
+                        put("message", JsonPrimitive("initial commit"))
+                    },
+                    ctx,
+                )
+            }
         assertTrue(commitResult is ToolResult.Ok, "commit failed: $commitResult")
 
-        val logResult = runBlocking {
-            tool.invoke(buildJsonObject { put("verb", JsonPrimitive("log")) }, ctx)
-        }
+        val logResult =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("verb", JsonPrimitive("log")) }, ctx)
+            }
         assertTrue(logResult is ToolResult.Ok)
         assertTrue(logResult.toString().contains("initial commit"))
     }
 
     @Test
-    fun `effectiveRequiresApproval is true only for clone`(@TempDir tempDir: Path) {
+    fun `effectiveRequiresApproval is true only for clone`(
+        @TempDir tempDir: Path,
+    ) {
         val tool = GitTool(tempDir)
         assertTrue(tool.effectiveRequiresApproval(buildJsonObject { put("verb", JsonPrimitive("clone")) }))
         assertTrue(!tool.effectiveRequiresApproval(buildJsonObject { put("verb", JsonPrimitive("status")) }))
@@ -92,14 +103,17 @@ class GitToolTest {
     }
 
     @Test
-    fun `unknown verb returns Err`(@TempDir tempDir: Path) {
+    fun `unknown verb returns Err`(
+        @TempDir tempDir: Path,
+    ) {
         initRepo(tempDir)
         val tool = GitTool(tempDir)
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("verb", JsonPrimitive("rebase")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("verb", JsonPrimitive("rebase")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Err)
         assertTrue((result as ToolResult.Err).message.contains("unknown git verb"))

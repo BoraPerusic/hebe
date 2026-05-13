@@ -10,18 +10,19 @@ class SsrfGuard(
     private val dnsCache = ConcurrentHashMap<String, DnsEntry>()
     private val dnsCacheTtlMs = 60_000L
 
-    private val blockedRanges = listOf(
-        BlockedRange("127.0.0.0/8", "Loopback"),
-        BlockedRange("::1", "Loopback"),
-        BlockedRange("169.254.0.0/16", "Link-local"),
-        BlockedRange("fe80::/10", "Link-local"),
-        BlockedRange("10.0.0.0/8", "Private"),
-        BlockedRange("172.16.0.0/12", "Private"),
-        BlockedRange("192.168.0.0/16", "Private"),
-        BlockedRange("fc00::/7", "Unique-local"),
-        BlockedRange("169.254.169.254", "AWS/Azure metadata"),
-        BlockedRange("metadata.google.internal", "GCP metadata"),
-    )
+    private val blockedRanges =
+        listOf(
+            BlockedRange("127.0.0.0/8", "Loopback"),
+            BlockedRange("::1", "Loopback"),
+            BlockedRange("169.254.0.0/16", "Link-local"),
+            BlockedRange("fe80::/10", "Link-local"),
+            BlockedRange("10.0.0.0/8", "Private"),
+            BlockedRange("172.16.0.0/12", "Private"),
+            BlockedRange("192.168.0.0/16", "Private"),
+            BlockedRange("fc00::/7", "Unique-local"),
+            BlockedRange("169.254.169.254", "AWS/Azure metadata"),
+            BlockedRange("metadata.google.internal", "GCP metadata"),
+        )
 
     fun isBlocked(url: String): SsrfResult {
         return try {
@@ -71,8 +72,14 @@ class SsrfGuard(
 
     sealed class SsrfResult {
         data object Allowed : SsrfResult()
-        data class Blocked(val reason: String) : SsrfResult()
-        data class Invalid(val reason: String) : SsrfResult()
+
+        data class Blocked(
+            val reason: String,
+        ) : SsrfResult()
+
+        data class Invalid(
+            val reason: String,
+        ) : SsrfResult()
     }
 
     private data class DnsEntry(
@@ -98,7 +105,10 @@ class SsrfGuard(
             }
         }
 
-        private fun containsIPv4(addr: String, cidr: String): Boolean {
+        private fun containsIPv4(
+            addr: String,
+            cidr: String,
+        ): Boolean {
             val slashIdx = cidr.indexOf("/")
             val networkAddr = cidr.substring(0, slashIdx)
             val prefixLen = cidr.substring(slashIdx + 1).toIntOrNull() ?: return false
@@ -110,7 +120,10 @@ class SsrfGuard(
             return (addrNum and mask) == (networkNum and mask)
         }
 
-        private fun containsIPv6(addr: String, cidr: String): Boolean {
+        private fun containsIPv6(
+            addr: String,
+            cidr: String,
+        ): Boolean {
             val slashIdx = cidr.indexOf("/")
             val networkAddr = cidr.substring(0, slashIdx)
             val prefixLen = cidr.substring(slashIdx + 1).toIntOrNull() ?: return false
@@ -138,9 +151,9 @@ class SsrfGuard(
         private fun ipToLong(addr: String): Long {
             val octets = addr.split(".").map { it.toLongOrNull() ?: 0 }
             return (octets.getOrElse(0) { 0 } shl 24) or
-                    (octets.getOrElse(1) { 0 } shl 16) or
-                    (octets.getOrElse(2) { 0 } shl 8) or
-                    octets.getOrElse(3) { 0 }
+                (octets.getOrElse(1) { 0 } shl 16) or
+                (octets.getOrElse(2) { 0 } shl 8) or
+                octets.getOrElse(3) { 0 }
         }
 
         private fun parseIPv6(addr: String): ByteArray? {

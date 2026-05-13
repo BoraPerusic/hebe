@@ -27,43 +27,56 @@ class WikiWriteTool(
         private const val WIKI_PREFIX = "wiki/"
     }
 
-    override val spec = ToolSpec(
-        name = "wiki_write",
-        description = "Write a wiki page by slug. Writes to memory as wiki/<slug>.md.",
-        schema = buildJsonObject {
-            put("type", JsonPrimitive("object"))
-            put("required", buildJsonArray { add(JsonPrimitive("slug")); add(JsonPrimitive("content")) })
-            put(
-                "properties",
+    override val spec =
+        ToolSpec(
+            name = "wiki_write",
+            description = "Write a wiki page by slug. Writes to memory as wiki/<slug>.md.",
+            schema =
                 buildJsonObject {
+                    put("type", JsonPrimitive("object"))
                     put(
-                        "slug",
-                        buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Wiki page slug"))
+                        "required",
+                        buildJsonArray {
+                            add(JsonPrimitive("slug"))
+                            add(JsonPrimitive("content"))
                         },
                     )
                     put(
-                        "content",
+                        "properties",
                         buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Page content (supports [[wikilinks]]))"))
+                            put(
+                                "slug",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Wiki page slug"))
+                                },
+                            )
+                            put(
+                                "content",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Page content (supports [[wikilinks]]))"))
+                                },
+                            )
                         },
                     )
                 },
-            )
-        },
-        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
-    )
+            pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+        )
 
     override val risk = RiskLevel.Medium
     override val readOnly = false
 
-    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
-        val slug = args["slug"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: slug")
-        val content = args["content"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: content")
+    override suspend fun invoke(
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolResult {
+        val slug =
+            args["slug"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: slug")
+        val content =
+            args["content"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: content")
 
         val path = "$WIKI_PREFIX$slug.md"
         logger.debug("wiki_write slug={} path={}", slug, path)

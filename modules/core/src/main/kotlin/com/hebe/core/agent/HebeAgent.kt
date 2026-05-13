@@ -150,8 +150,8 @@ class HebeAgent(
         return LoopOutcome.Response(msg)
     }
 
-    private suspend fun handleAuthMode(submission: Submission.AuthMode): LoopOutcome {
-        return try {
+    private suspend fun handleAuthMode(submission: Submission.AuthMode): LoopOutcome =
+        try {
             secretStore.set(submission.purpose, submission.secret.toByteArray(Charsets.UTF_8))
             logger.debug("credential stored for purpose={}", submission.purpose)
             LoopOutcome.Response("[credential stored]")
@@ -159,7 +159,6 @@ class HebeAgent(
             logger.error("failed to store credential for purpose={}", submission.purpose, e)
             LoopOutcome.Failure("failed to store credential: ${e.message}")
         }
-    }
 
     private fun handleQuit(): LoopOutcome = LoopOutcome.Stopped
 }

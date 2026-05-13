@@ -15,49 +15,55 @@ import org.slf4j.LoggerFactory
 class AskUserTool : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    override val spec = ToolSpec(
-        name = "ask_user",
-        description = "Ask the user a question. Returns NeedsApproval which is delivered via the originating channel.",
-        schema = buildJsonObject {
-            put("type", JsonPrimitive("object"))
-            put("required", buildJsonArray { add(JsonPrimitive("question")) })
-            put(
-                "properties",
+    override val spec =
+        ToolSpec(
+            name = "ask_user",
+            description = "Ask the user a question. Returns NeedsApproval which is delivered via the originating channel.",
+            schema =
                 buildJsonObject {
+                    put("type", JsonPrimitive("object"))
+                    put("required", buildJsonArray { add(JsonPrimitive("question")) })
                     put(
-                        "question",
+                        "properties",
                         buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Question to ask the user"))
-                        },
-                    )
-                    put(
-                        "purpose",
-                        buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Purpose: general or credential"))
-                            put("default", JsonPrimitive("general"))
-                        },
-                    )
-                    put(
-                        "secretName",
-                        buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Required when purpose=credential"))
+                            put(
+                                "question",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Question to ask the user"))
+                                },
+                            )
+                            put(
+                                "purpose",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Purpose: general or credential"))
+                                    put("default", JsonPrimitive("general"))
+                                },
+                            )
+                            put(
+                                "secretName",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Required when purpose=credential"))
+                                },
+                            )
                         },
                     )
                 },
-            )
-        },
-        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
-    )
+            pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+        )
 
     override val risk = RiskLevel.Low
     override val readOnly = true
 
-    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
-        val question = args["question"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: question")
+    override suspend fun invoke(
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolResult {
+        val question =
+            args["question"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: question")
         val purpose = args["purpose"]?.jsonPrimitive?.content ?: "general"
         val secretName = args["secretName"]?.jsonPrimitive?.content
 
@@ -67,10 +73,11 @@ class AskUserTool : Tool {
             return ToolResult.Err("secretName required when purpose=credential")
         }
 
-        val payload = buildJsonObject {
-            put("purpose", JsonPrimitive(purpose))
-            secretName?.let { put("secretName", JsonPrimitive(it)) }
-        }
+        val payload =
+            buildJsonObject {
+                put("purpose", JsonPrimitive(purpose))
+                secretName?.let { put("secretName", JsonPrimitive(it)) }
+            }
 
         return ToolResult.NeedsApproval(question, payload)
     }

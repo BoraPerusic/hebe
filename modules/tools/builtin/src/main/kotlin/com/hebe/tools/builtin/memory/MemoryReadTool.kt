@@ -1,7 +1,5 @@
 package com.hebe.tools.builtin.memory
 
-import com.hebe.api.MemoryCategory
-import com.hebe.api.MemoryScope
 import com.hebe.api.MemoryStore
 import com.hebe.api.RiskLevel
 import com.hebe.api.Tool
@@ -20,34 +18,40 @@ class MemoryReadTool(
 ) : Tool {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    override val spec = ToolSpec(
-        name = "memory_read",
-        description = "Read a document from memory by path.",
-        schema = buildJsonObject {
-            put("type", JsonPrimitive("object"))
-            put("required", buildJsonArray { add(JsonPrimitive("path")) })
-            put(
-                "properties",
+    override val spec =
+        ToolSpec(
+            name = "memory_read",
+            description = "Read a document from memory by path.",
+            schema =
                 buildJsonObject {
+                    put("type", JsonPrimitive("object"))
+                    put("required", buildJsonArray { add(JsonPrimitive("path")) })
                     put(
-                        "path",
+                        "properties",
                         buildJsonObject {
-                            put("type", JsonPrimitive("string"))
-                            put("description", JsonPrimitive("Document path"))
+                            put(
+                                "path",
+                                buildJsonObject {
+                                    put("type", JsonPrimitive("string"))
+                                    put("description", JsonPrimitive("Document path"))
+                                },
+                            )
                         },
                     )
                 },
-            )
-        },
-        pathScope = com.hebe.api.PathScope.WorkspaceOnly,
-    )
+            pathScope = com.hebe.api.PathScope.WorkspaceOnly,
+        )
 
     override val risk = RiskLevel.Low
     override val readOnly = true
 
-    override suspend fun invoke(args: JsonObject, ctx: ToolContext): ToolResult {
-        val path = args["path"]?.jsonPrimitive?.content
-            ?: return ToolResult.Err("missing required argument: path")
+    override suspend fun invoke(
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolResult {
+        val path =
+            args["path"]?.jsonPrimitive?.content
+                ?: return ToolResult.Err("missing required argument: path")
 
         logger.debug("memory_read path={}", path)
 

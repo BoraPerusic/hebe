@@ -19,15 +19,16 @@ class JobToolsTest {
     fun `job_create returns pending status with id`() {
         val tool = JobCreateTool()
 
-        val result = runBlocking {
-            tool.invoke(
-                buildJsonObject {
-                    put("kind", JsonPrimitive("adhoc"))
-                    put("payload", JsonPrimitive("""{"task":"run"}"""))
-                },
-                ctx,
-            )
-        }
+        val result =
+            runBlocking {
+                tool.invoke(
+                    buildJsonObject {
+                        put("kind", JsonPrimitive("adhoc"))
+                        put("payload", JsonPrimitive("""{"task":"run"}"""))
+                    },
+                    ctx,
+                )
+            }
 
         assertTrue(result is ToolResult.Ok)
         val obj = (result as ToolResult.Ok).content as JsonObject
@@ -39,15 +40,16 @@ class JobToolsTest {
     fun `job_create with invalid kind returns Err`() {
         val tool = JobCreateTool()
 
-        val result = runBlocking {
-            tool.invoke(
-                buildJsonObject {
-                    put("kind", JsonPrimitive("unknown-kind"))
-                    put("payload", JsonPrimitive("{}"))
-                },
-                ctx,
-            )
-        }
+        val result =
+            runBlocking {
+                tool.invoke(
+                    buildJsonObject {
+                        put("kind", JsonPrimitive("unknown-kind"))
+                        put("payload", JsonPrimitive("{}"))
+                    },
+                    ctx,
+                )
+            }
 
         assertTrue(result is ToolResult.Err)
         assertTrue((result as ToolResult.Err).message.contains("invalid kind"))
@@ -57,9 +59,10 @@ class JobToolsTest {
     fun `job_cancel returns cancelled status`() {
         val tool = JobCancelTool()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("id", JsonPrimitive("job-123")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("id", JsonPrimitive("job-123")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Ok)
         val obj = (result as ToolResult.Ok).content as JsonObject
@@ -71,9 +74,10 @@ class JobToolsTest {
     fun `job_status returns pending for any id`() {
         val tool = JobStatusTool()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("id", JsonPrimitive("job-456")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("id", JsonPrimitive("job-456")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Ok)
         val obj = (result as ToolResult.Ok).content as JsonObject
@@ -84,9 +88,10 @@ class JobToolsTest {
     fun `job_create missing kind returns Err`() {
         val tool = JobCreateTool()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("payload", JsonPrimitive("{}")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("payload", JsonPrimitive("{}")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Err)
         assertTrue((result as ToolResult.Err).message.contains("missing required argument"))

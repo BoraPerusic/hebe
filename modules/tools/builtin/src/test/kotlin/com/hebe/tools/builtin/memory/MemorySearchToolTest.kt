@@ -21,15 +21,17 @@ class MemorySearchToolTest {
     @Test
     fun `search returns hits`() {
         val memory = mockk<MemoryStore>()
-        coEvery { memory.search(any(), any(), any(), any()) } returns listOf(
-            MemoryHit("docs/faq", 0, "snippet text", 0.9, HitSource.Fts),
-        )
+        coEvery { memory.search(any(), any(), any(), any()) } returns
+            listOf(
+                MemoryHit("docs/faq", 0, "snippet text", 0.9, HitSource.Fts),
+            )
         val tool = MemorySearchTool(memory)
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("query", JsonPrimitive("faq")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("query", JsonPrimitive("faq")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Ok)
         val arr = (result as ToolResult.Ok).content as JsonArray
@@ -46,9 +48,10 @@ class MemorySearchToolTest {
         val tool = MemorySearchTool(memory)
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("query", JsonPrimitive("nothing")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("query", JsonPrimitive("nothing")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Ok)
         val arr = (result as ToolResult.Ok).content as JsonArray

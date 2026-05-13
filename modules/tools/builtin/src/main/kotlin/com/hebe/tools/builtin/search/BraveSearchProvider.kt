@@ -5,7 +5,6 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.statement.bodyAsText
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -20,16 +19,20 @@ class BraveSearchProvider(
 
     override val name = "brave"
 
-    override suspend fun search(query: String, k: Int): List<SearchHit> {
+    override suspend fun search(
+        query: String,
+        k: Int,
+    ): List<SearchHit> {
         logger.debug("brave search query={} k={}", query, k)
         return try {
-            val resp = client.get("https://api.search.brave.com/res/v1/web/search") {
-                header("X-Subscription-Token", apiKey)
-                url {
-                    parameters.append("q", query)
-                    parameters.append("count", k.toString())
+            val resp =
+                client.get("https://api.search.brave.com/res/v1/web/search") {
+                    header("X-Subscription-Token", apiKey)
+                    url {
+                        parameters.append("q", query)
+                        parameters.append("count", k.toString())
+                    }
                 }
-            }
             val body = resp.bodyAsText()
             parseBraveResponse(body)
         } catch (e: Exception) {

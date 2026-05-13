@@ -53,7 +53,7 @@ hebe/
 │   ├── tools/dispatch/             ← ToolDispatcher (the mutation funnel) + execute pipeline
 │   ├── core/                       ← agent loop wrapping koog, hooks, delegates, submission
 │   ├── plugins/                    ← PF4J host + manifest + signature + OCI distribution
-│   ├── channels/api/               ← Channel manager, IncomingMessage, OutboundMessage, ReplyContext
+│   ├── channels/channel-manager/    ← Channel manager, IncomingMessage, OutboundMessage, ReplyContext
 │   ├── channels/cli/               ← CLI REPL
 │   ├── channels/web/               ← Ktor SSE/WebSocket + browser UI
 │   ├── channels/telegram/          ← Telegram channel

@@ -5,21 +5,22 @@ import com.hebe.api.ToolResult
 import com.hebe.api.workspace.WorkspacePath
 import com.hebe.memory.workspace.WorkspaceFs
 import io.mockk.mockk
+import java.nio.file.Path
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.nio.file.Path
 
 class FileSystemListToolTest {
     @Test
-    fun `list empty workspace returns empty array`(@TempDir tempDir: Path) {
+    fun `list empty workspace returns empty array`(
+        @TempDir tempDir: Path,
+    ) {
         val tool = FileSystemListTool(WorkspaceFs(tempDir))
         val ctx = mockk<ToolContext>()
 
@@ -31,7 +32,9 @@ class FileSystemListToolTest {
     }
 
     @Test
-    fun `list returns entry per file with name and size`(@TempDir tempDir: Path) {
+    fun `list returns entry per file with name and size`(
+        @TempDir tempDir: Path,
+    ) {
         val fs = WorkspaceFs(tempDir)
         fs.write(WorkspacePath("alpha.txt"), "hello")
         fs.write(WorkspacePath("beta.txt"), "world!")

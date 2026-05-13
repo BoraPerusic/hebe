@@ -10,5 +10,9 @@ data class SearchHit(
 
 interface WebSearchProvider {
     val name: String
-    suspend fun search(query: String, k: Int = 10): List<SearchHit>
+
+    suspend fun search(
+        query: String,
+        k: Int = 10,
+    ): List<SearchHit>
 }

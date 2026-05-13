@@ -9,7 +9,7 @@ mcp                 = "0.11.0"
 sqliteJdbc          = "3.53.0.0"
 sqliteVec           = "0.1.8"
 flyway              = "11.20.3"
-telegram            = "8.0.0"
+telegram            = "9.6.0"
 jgit                = "6.10.0.202406032230-r"
 bouncycastle        = "1.84"
 pf4j                = "3.15.0"
@@ -26,6 +26,7 @@ detekt              = "1.23.8"
 ktlint              = "14.2.0"
 shadow              = "9.4.1"
 clikt               = "5.0.0"
+jline               = "4.1.0"
 logstashEncoder     = "8.1"
 
 [libraries]
@@ -45,16 +46,21 @@ ktor-server-netty         = { module = "io.ktor:ktor-server-netty",             
 ktor-server-cnegot         = { module = "io.ktor:ktor-server-content-negotiation",          version.ref = "ktor" }
 ktor-server-sse           = { module = "io.ktor:ktor-server-sse",                           version.ref = "ktor" }
 ktor-server-websockets    = { module = "io.ktor:ktor-server-websockets",                    version.ref = "ktor" }
+ktor-server-test-host     = { module = "io.ktor:ktor-server-test-host",                    version.ref = "ktor" }
 ktor-server-auth           = { module = "io.ktor:ktor-server-auth",                         version.ref = "ktor" }
+ktor-server-cors           = { module = "io.ktor:ktor-server-cors",                         version.ref = "ktor" }
 ktor-serialization-json   = { module = "io.ktor:ktor-serialization-kotlinx-json",           version.ref = "ktor" }
 ktor-client-core          = { module = "io.ktor:ktor-client-core",                          version.ref = "ktor" }
 ktor-client-cio           = { module = "io.ktor:ktor-client-cio",                           version.ref = "ktor" }
+ktor-client-test-host     = { module = "io.ktor:ktor-client-test-host",                    version.ref = "ktor" }
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation",     version.ref = "ktor" }
 ktor-client-logging       = { module = "io.ktor:ktor-client-logging",                       version.ref = "ktor" }
 mcp-kotlin-sdk            = { module = "io.modelcontextprotocol:kotlin-sdk",                version.ref = "mcp" }
 sqlite-jdbc               = { module = "org.xerial:sqlite-jdbc",                            version.ref = "sqliteJdbc" }
 flyway-core               = { module = "org.flywaydb:flyway-core",                          version.ref = "flyway" }
 telegrambots              = { module = "org.telegram:telegrambots",                         version.ref = "telegram" }
+telegrambots-longpolling = { module = "org.telegram:telegrambots-longpolling",                version.ref = "telegram" }
+telegrambots-client-jetty = { module = "org.telegram:telegrambots-client-jetty-adapter",         version.ref = "telegram" }
 jgit                      = { module = "org.eclipse.jgit:org.eclipse.jgit",                 version.ref = "jgit" }
 bouncycastle              = { module = "org.bouncycastle:bcprov-jdk18on",                   version.ref = "bouncycastle" }
 pf4j                      = { module = "org.pf4j:pf4j",                                     version.ref = "pf4j" }
@@ -70,6 +76,7 @@ kotest-assertions         = { module = "io.kotest:kotest-assertions-core",      
 kotest-framework-engine   = { module = "io.kotest:kotest-framework-engine",                 version.ref = "kotest" }
 kotest-junit-platform-runner = { module = "io.kotest:kotest-runner-junit5-jvm",             version.ref = "kotest" }
 kotest-property            = { module = "io.kotest:kotest-property",                        version.ref = "kotest" }
+jline                     = { module = "org.jline:jline",                                    version.ref = "jline" }
 mockk                     = { module = "io.mockk:mockk",                                    version.ref = "mockk" }
 testcontainers             = { module = "org.testcontainers:testcontainers",                version.ref = "testcontainers" }
 clikt                     = { module = "com.github.ajalt.clikt:clikt",                      version.ref = "clikt" }
@@ -84,6 +91,8 @@ ktor-server = [
     "ktor-server-sse",
     "ktor-server-websockets",
     "ktor-server-auth",
+    "ktor-server-cors",
+    "ktor-server-test-host",
     "ktor-serialization-json",
 ]
 ktor-client = ["ktor-client-core", "ktor-client-cio", "ktor-client-content-negotiation", "ktor-client-logging", "ktor-serialization-json"]

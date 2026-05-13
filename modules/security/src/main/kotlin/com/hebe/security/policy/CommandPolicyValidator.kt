@@ -54,11 +54,12 @@ class CommandPolicyValidator(
         }
     }
 
-    private fun normalizeGlobPatterns(patterns: List<String>): List<String> {
-        return patterns.map { it.trim() }
-    }
+    private fun normalizeGlobPatterns(patterns: List<String>): List<String> = patterns.map { it.trim() }
 
-    private fun matchesGlob(cmd: String, glob: String): Boolean {
+    private fun matchesGlob(
+        cmd: String,
+        glob: String,
+    ): Boolean {
         val trimmedGlob = glob.trim()
         val trimmedCmd = cmd.trim()
 

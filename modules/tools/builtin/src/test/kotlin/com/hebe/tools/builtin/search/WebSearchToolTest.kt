@@ -32,9 +32,10 @@ class WebSearchToolTest {
         every { ctx.secretLookup } returns secretLookup
 
         // DuckDuckGo may fail in test environment but the provider catches and returns empty list
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("query", JsonPrimitive("test query")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("query", JsonPrimitive("test query")) }, ctx)
+            }
 
         // Either Ok (empty hits when network unavailable) or Ok (with hits when network available)
         assertTrue(result is ToolResult.Ok)
@@ -49,9 +50,10 @@ class WebSearchToolTest {
         every { ctx.secretLookup } returns secretLookup
 
         // Brave will fail with a fake key but BraveSearchProvider catches and returns empty list
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("query", JsonPrimitive("test query")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("query", JsonPrimitive("test query")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Ok)
     }

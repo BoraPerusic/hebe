@@ -8,9 +8,11 @@ References: [`../v1-architecture.md`](../v1-architecture.md) §§10, 14, 16, 17.
 
 ---
 
-## M5.T1 — `channels/api`: `ChannelManager`, `injectChannel`, recursion guards
+## M5.T1 — `channels/channel-manager`: `ChannelManagerImpl`, `injectChannel`, recursion guards
 
-**Status**: pending  
+> **Note (implemented)**: module renamed from `channels/api` → `channels/channel-manager` to avoid ambiguity with `:modules:api`. `ChannelRegistry` was merged into `ChannelManagerImpl`.
+
+**Status**: done  
 **Size**: M  
 **Depends on**: M0.T5  
 **Blocks**: every concrete channel
@@ -19,12 +21,11 @@ References: [`../v1-architecture.md`](../v1-architecture.md) §§10, 14, 16, 17.
 
 The seam between channels and the agent. Merges N channel flows into one; provides an `injectChannel` for background producers (heartbeat, scheduler, MCP server) to push messages without being a full `Channel`.
 
-### Files to create
+### Files created
 
-- `modules/channels/api/build.gradle.kts` (edit)
-- `modules/channels/api/src/main/kotlin/com/hebe/channels/ChannelManager.kt` (new)
-- `modules/channels/api/src/main/kotlin/com/hebe/channels/InjectChannel.kt` (new)
-- `modules/channels/api/src/main/kotlin/com/hebe/channels/ChannelRegistry.kt` (new)
+- `modules/channels/channel-manager/build.gradle.kts`
+- `modules/channels/channel-manager/src/main/kotlin/com/hebe/channels/ChannelManagerImpl.kt`
+- `modules/channels/channel-manager/src/main/kotlin/com/hebe/channels/InjectChannel.kt`
 - Tests
 
 ### Detailed work

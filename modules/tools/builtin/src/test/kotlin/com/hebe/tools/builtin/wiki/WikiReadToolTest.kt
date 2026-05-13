@@ -5,6 +5,7 @@ import com.hebe.api.ToolResult
 import com.hebe.api.workspace.WorkspacePath
 import com.hebe.memory.workspace.WorkspaceFs
 import io.mockk.mockk
+import java.nio.file.Path
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -15,19 +16,21 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
-import java.nio.file.Path
 
 class WikiReadToolTest {
     @Test
-    fun `read existing wiki page returns content and slug`(@TempDir tempDir: Path) {
+    fun `read existing wiki page returns content and slug`(
+        @TempDir tempDir: Path,
+    ) {
         val fs = WorkspaceFs(tempDir)
         fs.write(WorkspacePath("wiki/architecture.md"), "# Architecture\nOverview here.")
         val tool = WikiReadTool(fs)
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("slug", JsonPrimitive("architecture")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("slug", JsonPrimitive("architecture")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Ok)
         val obj = (result as ToolResult.Ok).content as JsonObject
@@ -36,15 +39,18 @@ class WikiReadToolTest {
     }
 
     @Test
-    fun `read extracts wikilinks from content`(@TempDir tempDir: Path) {
+    fun `read extracts wikilinks from content`(
+        @TempDir tempDir: Path,
+    ) {
         val fs = WorkspaceFs(tempDir)
         fs.write(WorkspacePath("wiki/guide.md"), "See [[setup]] and [[teardown]] for details.")
         val tool = WikiReadTool(fs)
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("slug", JsonPrimitive("guide")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("slug", JsonPrimitive("guide")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Ok)
         val obj = (result as ToolResult.Ok).content as JsonObject
@@ -54,13 +60,16 @@ class WikiReadToolTest {
     }
 
     @Test
-    fun `read missing wiki page returns Err`(@TempDir tempDir: Path) {
+    fun `read missing wiki page returns Err`(
+        @TempDir tempDir: Path,
+    ) {
         val tool = WikiReadTool(WorkspaceFs(tempDir))
         val ctx = mockk<ToolContext>()
 
-        val result = runBlocking {
-            tool.invoke(buildJsonObject { put("slug", JsonPrimitive("nonexistent")) }, ctx)
-        }
+        val result =
+            runBlocking {
+                tool.invoke(buildJsonObject { put("slug", JsonPrimitive("nonexistent")) }, ctx)
+            }
 
         assertTrue(result is ToolResult.Err)
         assertTrue((result as ToolResult.Err).message.contains("not found"))
