@@ -21,5 +21,7 @@ dependencies {
     implementation(project(":modules:observability"))
     implementation(project(":modules:security"))
     implementation(project(":modules:tools:dispatch"))
+    implementation(project(":modules:plugins"))
     implementation(libs.ktor.server.core)
+    implementation(libs.kotlinx.coroutines.core)
 }

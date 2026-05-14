@@ -13,7 +13,21 @@ data class HebeConfig(
     val plugins: PluginsSection,
     val mcp: McpSection,
     val cost: CostSection = CostSection(),
-)
+) {
+    companion object {
+        fun default(): HebeConfig =
+            HebeConfig(
+                hebe = HebeSection(),
+                llm = LlmSection("", "", "", ""),
+                autonomy = AutonomySection(),
+                security = SecuritySection(),
+                scheduler = SchedulerSection(),
+                channels = ChannelsSection(),
+                plugins = PluginsSection(),
+                mcp = McpSection(),
+            )
+    }
+}
 
 @Serializable
 data class HebeSection(

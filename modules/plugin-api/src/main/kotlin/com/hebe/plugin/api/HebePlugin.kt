@@ -8,12 +8,6 @@ abstract class HebePlugin(
 ) : Plugin(wrapper) {
     open fun tools(host: PluginHost): List<com.hebe.api.Tool> = emptyList()
 
-    open fun channels(host: PluginHost): List<com.hebe.api.Channel> = emptyList()
-
-    open fun memoryStores(host: PluginHost): List<com.hebe.api.MemoryStore> = emptyList()
-
-    open fun observers(host: PluginHost): List<com.hebe.api.Observer> = emptyList()
-
     open fun init(host: PluginHost) {}
 
     open fun teardown() {}

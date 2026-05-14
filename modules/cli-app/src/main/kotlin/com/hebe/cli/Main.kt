@@ -1,3 +1,11 @@
+@file:Suppress(
+    "TooGenericExceptionCaught",
+    "MagicNumber",
+    "LongMethod",
+    "EmptyFunctionBlock",
+    "MaxLineLength",
+)
+
 package com.hebe.cli
 
 import com.github.ajalt.clikt.core.CliktCommand
@@ -5,6 +13,7 @@ import com.github.ajalt.clikt.core.main
 import com.github.ajalt.clikt.core.subcommands
 import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
+import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.hebe.security.estop.EstopIpc
 import com.hebe.security.receipts.ReceiptVerifier
@@ -15,6 +24,7 @@ import java.nio.file.Paths
 import java.util.Base64
 import kotlin.io.path.exists
 import kotlin.io.path.readText
+import kotlinx.coroutines.runBlocking
 
 fun main(args: Array<String>) {
     HebeCLI().main(args)
@@ -62,20 +72,236 @@ class McpServeCommand : CliktCommand(name = "mcp serve") {
 }
 
 class PluginInstallCommand : CliktCommand(name = "plugin install") {
+    private val refOrPath by argument(help = "OCI reference (e.g. ghcr.io/user/hello-plugin:0.1.0) or local path to .zip file")
+    private val unsigned by option("--unsigned", help = "Skip signature verification (for local/sideloaded plugins)").flag()
+    private val configPath =
+        java.nio.file.Path
+            .of(System.getProperty("user.home"), ".hebe", "config.toml")
+    private val hebeConfig: com.hebe.config.HebeConfig by lazy {
+        if (java.nio.file.Files
+                .exists(configPath)
+        ) {
+            com.hebe.config.ConfigLoader().load(configPath).let { result ->
+                when (result) {
+                    is com.hebe.config.ConfigResult.Ok -> result.value
+                    is com.hebe.config.ConfigResult.Error -> {
+                        System.err.println("Warning: failed to load config, using defaults")
+                        com.hebe.config.HebeConfig
+                            .default()
+                    }
+                }
+            }
+        } else {
+            com.hebe.config.HebeConfig
+                .default()
+        }
+    }
+    private val pluginsDir =
+        java.nio.file.Path
+            .of(System.getProperty("user.home"), ".hebe", "plugins")
+    private val settingsStore: com.hebe.config.SettingsStore =
+        com.hebe.config.defaultSettingsStore()
+
     override fun run() {
-        echo("Not yet implemented: hebe plugin install")
+        val input = refOrPath
+        if (input.isBlank()) {
+            echo("Error: plugin reference or path required")
+            return
+        }
+        val isFile =
+            java.nio.file.Files
+                .exists(
+                    java.nio.file.Path
+                        .of(input),
+                ) &&
+                java.nio.file.Path
+                    .of(input)
+                    .toFile()
+                    .isFile
+        val verifier =
+            com.hebe.plugins.signature.SignatureVerifier(
+                signatureMode = hebeConfig.security.pluginSignatureMode,
+                trustedPublisherKeys = hebeConfig.plugins.publisherKeys,
+                log = org.slf4j.LoggerFactory.getLogger("plugin-install"),
+            )
+        if (isFile) {
+            val path =
+                java.nio.file.Path
+                    .of(input)
+            echo("Installing plugin from local file: $path")
+            runBlocking {
+                val sideloadFlow =
+                    com.hebe.plugins.install.SideloadFlow(
+                        signatureVerifier = verifier,
+                        pluginsDir = pluginsDir,
+                        log = org.slf4j.LoggerFactory.getLogger("plugin-install"),
+                    )
+                val result = sideloadFlow.sideload(path, unsigned)
+                when (result) {
+                    is com.hebe.plugins.install.InstallResult.Ok -> {
+                        runBlocking { settingsStore.setInstalledPlugin(result.name, result.version, source = "sideload") }
+                        echo("Installed: ${result.name}")
+                        echo("Location: ${result.extractDir}")
+                    }
+                    is com.hebe.plugins.install.InstallResult.Error -> {
+                        echo("Error: ${result.message}")
+                        throw com.github.ajalt.clikt.core
+                            .Abort()
+                    }
+                }
+            }
+        } else {
+            val registryHost = hebeConfig.plugins.registry.takeIf { it.isNotBlank() } ?: "ghcr.io"
+            val fullRef = if (input.contains("/")) input else "$registryHost/$input"
+            echo("Installing plugin from: $fullRef")
+            runBlocking {
+                val secretStore =
+                    object : com.hebe.config.SecretStoreProvider {
+                        override suspend fun get(key: String): ByteArray? = null
+
+                        override suspend fun set(
+                            key: String,
+                            value: ByteArray,
+                        ) {}
+
+                        override suspend fun delete(key: String): Boolean = false
+
+                        override suspend fun list(): List<String> = emptyList()
+                    }
+                val ociClient =
+                    com.hebe.plugins.oci.OciClient(
+                        registry = registryHost,
+                        secretStore = secretStore,
+                        log = org.slf4j.LoggerFactory.getLogger("plugin-install"),
+                    )
+                val installFlow =
+                    com.hebe.plugins.install.InstallFlow(
+                        ociClient = ociClient,
+                        signatureVerifier = verifier,
+                        pluginsDir = pluginsDir,
+                        log = org.slf4j.LoggerFactory.getLogger("plugin-install"),
+                    )
+                val result = installFlow.install(fullRef)
+                when (result) {
+                    is com.hebe.plugins.install.InstallResult.Ok -> {
+                        runBlocking { settingsStore.setInstalledPlugin(result.name, result.version, source = fullRef) }
+                        echo("Installed: ${result.name}")
+                        echo("Location: ${result.extractDir}")
+                    }
+                    is com.hebe.plugins.install.InstallResult.Error -> {
+                        echo("Error: ${result.message}")
+                        throw com.github.ajalt.clikt.core
+                            .Abort()
+                    }
+                }
+            }
+        }
     }
 }
 
 class PluginListCommand : CliktCommand(name = "plugin list") {
+    private val pluginsDir =
+        java.nio.file.Path
+            .of(System.getProperty("user.home"), ".hebe", "plugins")
+    private val settingsStore: com.hebe.config.SettingsStore =
+        com.hebe.config.defaultSettingsStore()
+
     override fun run() {
-        echo("Not yet implemented: hebe plugin list")
+        runBlocking {
+            val plugins = settingsStore.getInstalledPlugins()
+            if (plugins.isEmpty()) {
+                echo("No plugins installed")
+                return@runBlocking
+            }
+            echo("")
+            echo("%-18s %-8s %-12s %-20s".format("ID", "VERSION", "STATUS", "CAPABILITIES"))
+            echo("%-18s %-8s %-12s %-20s".format("--", "-------", "------", "------------"))
+            for (plugin in plugins.sortedBy { it.name }) {
+                val pluginPath = pluginsDir.resolve("${plugin.name}-${plugin.version}")
+                val status = resolvePluginStatus(pluginPath, plugin.source)
+                val caps = resolvePluginCapabilities(pluginPath)
+                echo("%-18s %-8s %-12s %-20s".format(plugin.name, plugin.version, status, caps))
+            }
+            echo("")
+            echo("${plugins.size} plugin(s) installed")
+        }
+    }
+
+    private fun resolvePluginStatus(
+        pluginPath: java.nio.file.Path,
+        source: String?,
+    ): String {
+        val exists = pluginPath.toFile().exists()
+        if (!exists) {
+            return "NOT_INSTALLED"
+        }
+        return if (source == "sideload") {
+            "SIDELOADED"
+        } else {
+            "INSTALLED"
+        }
+    }
+
+    private fun resolvePluginCapabilities(pluginPath: java.nio.file.Path): String {
+        val exists = pluginPath.toFile().exists()
+        if (!exists) {
+            return "-"
+        }
+        val capsVal = readPluginCapabilities(pluginPath)
+        return if (capsVal != null) {
+            capsVal.capabilities.joinToString(",") { it.name.lowercase() }
+        } else {
+            "-"
+        }
+    }
+
+    private fun readPluginCapabilities(pluginPath: java.nio.file.Path): com.hebe.plugin.api.PluginManifest? {
+        val tomlPath = pluginPath.resolve("plugin.toml")
+        val exists = tomlPath.toFile().exists()
+        if (!exists) {
+            return null
+        }
+        return try {
+            val parser = com.hebe.plugins.manifest.ManifestParser
+            val result = parser.parse(tomlPath)
+            if (result is com.hebe.plugins.manifest.ManifestResult.Ok) {
+                result.value
+            } else {
+                null
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 }
 
 class PluginRemoveCommand : CliktCommand(name = "plugin remove") {
+    private val pluginsDir =
+        java.nio.file.Path
+            .of(System.getProperty("user.home"), ".hebe", "plugins")
+    private val settingsStore: com.hebe.config.SettingsStore =
+        com.hebe.config.defaultSettingsStore()
+    private val name by argument(help = "Plugin name (e.g. hello-plugin-0.1.0)")
+
     override fun run() {
-        echo("Not yet implemented: hebe plugin remove")
+        val pluginPath = pluginsDir.resolve(name)
+        if (!java.nio.file.Files
+                .exists(pluginPath)
+        ) {
+            echo("Error: plugin '$name' not found at $pluginPath")
+            return
+        }
+        try {
+            java.nio.file.Files
+                .walk(pluginPath)
+                .sorted(Comparator.reverseOrder())
+                .map { it.toFile() }
+                .forEach { it.delete() }
+            runBlocking { settingsStore.removeInstalledPlugin(name) }
+            echo("Removed plugin: $name")
+        } catch (e: Exception) {
+            echo("Error removing plugin: ${e.message}")
+        }
     }
 }
 
