@@ -67,7 +67,8 @@ class RunCommand : CliktCommand(name = "run") {
 
 class McpServeCommand : CliktCommand(name = "mcp serve") {
     private val configPath =
-        java.nio.file.Path.of(System.getProperty("user.home"), ".hebe", "config.toml")
+        java.nio.file.Path
+            .of(System.getProperty("user.home"), ".hebe", "config.toml")
 
     override fun run() {
         val hebeConfig = loadConfig()
@@ -77,27 +78,74 @@ class McpServeCommand : CliktCommand(name = "mcp serve") {
             return
         }
 
+        val registry =
+            com.hebe.tools.dispatch
+                .ToolRegistry()
+
+        val workspacePath =
+            java.nio.file.Path.of(
+                hebeConfig.hebe.dataDir.replace("~", System.getProperty("user.home")),
+            )
+        com.hebe.mcp.registerMcpBuiltinTools(registry, workspacePath)
+
+        val validators =
+            com.hebe.security.policy.PolicyChain
+                .standard(hebeConfig, workspacePath)
+
+        val receiptsDir =
+            java.nio.file.Paths
+                .get(System.getProperty("user.home"), ".hebe", "receipts")
+        val signingKey = loadOrCreateSigningKey(receiptsDir)
+        val receipts =
+            com.hebe.security.receipts
+                .Receipts(receiptsDir, signingKey)
+
+        val dispatcher =
+            com.hebe.mcp.McpDispatcherFactory
+                .createLightweightDispatcher(registry, validators, receipts)
+
         echo("Starting Hebe MCP Server (stdio mode)...")
         runBlocking<Unit> {
-            com.hebe.mcp.runMcpStdioServer(hebeConfig)
+            com.hebe.mcp.runMcpStdioServer(hebeConfig, registry, dispatcher)
         }
     }
 
-    private fun loadConfig(): com.hebe.config.HebeConfig {
-        return if (java.nio.file.Files.exists(configPath)) {
+    private fun loadOrCreateSigningKey(receiptsDir: java.nio.file.Path): com.hebe.security.receipts.Ed25519PrivateKey {
+        val keyFile = receiptsDir.resolve("private.key")
+        return if (keyFile.exists()) {
+            val bytes = Base64.getDecoder().decode(keyFile.readText().trim())
+            com.hebe.security.receipts.Ed25519PrivateKey
+                .load(bytes)
+        } else {
+            java.nio.file.Files
+                .createDirectories(receiptsDir)
+            val key =
+                com.hebe.security.receipts.Ed25519PrivateKey
+                    .generate()
+            java.nio.file.Files
+                .writeString(keyFile, Base64.getEncoder().encodeToString(key.encode()))
+            key
+        }
+    }
+
+    private fun loadConfig(): com.hebe.config.HebeConfig =
+        if (java.nio.file.Files
+                .exists(configPath)
+        ) {
             com.hebe.config.ConfigLoader().load(configPath).let { result ->
                 when (result) {
                     is com.hebe.config.ConfigResult.Ok -> result.value
                     is com.hebe.config.ConfigResult.Error -> {
                         System.err.println("Warning: failed to load config, using defaults")
-                        com.hebe.config.HebeConfig.default()
+                        com.hebe.config.HebeConfig
+                            .default()
                     }
                 }
             }
         } else {
-            com.hebe.config.HebeConfig.default()
+            com.hebe.config.HebeConfig
+                .default()
         }
-    }
 }
 
 class PluginInstallCommand : CliktCommand(name = "plugin install") {
@@ -298,7 +346,7 @@ class PluginListCommand : CliktCommand(name = "plugin list") {
             } else {
                 null
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }

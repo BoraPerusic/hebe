@@ -1,6 +1,14 @@
 package com.hebe.mcp
 
 import com.hebe.config.HebeConfig
+import com.hebe.memory.workspace.WorkspaceFs
+import com.hebe.tools.builtin.file.FileSystemAppendTool
+import com.hebe.tools.builtin.file.FileSystemGlobTool
+import com.hebe.tools.builtin.file.FileSystemListTool
+import com.hebe.tools.builtin.file.FileSystemReadTool
+import com.hebe.tools.builtin.file.FileSystemWriteTool
+import com.hebe.tools.dispatch.ToolDispatcher
+import com.hebe.tools.dispatch.ToolRegistry
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
@@ -9,7 +17,7 @@ import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
-import kotlinx.coroutines.runBlocking
+import java.nio.file.Path
 import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
@@ -20,11 +28,29 @@ import org.slf4j.LoggerFactory
 
 private val logger = LoggerFactory.getLogger("com.hebe.mcp.McpServer")
 
-@Suppress("UnusedParameter")
-suspend fun runMcpStdioServer(config: HebeConfig) {
+fun registerMcpBuiltinTools(
+    registry: ToolRegistry,
+    workspaceRoot: Path,
+) {
+    val fs = WorkspaceFs(workspaceRoot)
+    registry.register(FileSystemReadTool(fs))
+    registry.register(FileSystemWriteTool(fs))
+    registry.register(FileSystemListTool(fs))
+    registry.register(FileSystemGlobTool(fs))
+    registry.register(FileSystemAppendTool(fs))
+    logger.info("Registered builtin filesystem tools")
+}
+
+suspend fun runMcpStdioServer(
+    config: HebeConfig,
+    registry: ToolRegistry,
+    dispatcher: ToolDispatcher,
+) {
     logger.info("Starting Hebe MCP Server (stdio mode)")
 
     val server = createHebeMcpServer()
+    val sessionId = "stdio-${System.currentTimeMillis()}"
+    server.registerToolsFromRegistry(registry, config.mcp.server, dispatcher, sessionId)
 
     val transport =
         StdioServerTransport(
@@ -39,29 +65,6 @@ suspend fun runMcpStdioServer(config: HebeConfig) {
     kotlinx.coroutines.Job().let { job ->
         session.onClose { job.complete() }
         job.join()
-    }
-}
-
-fun main(args: Array<String>) {
-    logger.info("Starting Hebe MCP Server (stdio mode)")
-
-    val server = createHebeMcpServer()
-
-    val transport =
-        StdioServerTransport(
-            System.`in`.asSource().buffered(),
-            System.out.asSink().buffered(),
-        )
-
-    runBlocking {
-        val session = server.createSession(transport)
-        session.onClose {
-            logger.info("MCP session closed")
-        }
-        kotlinx.coroutines.Job().let { job ->
-            session.onClose { job.complete() }
-            job.join()
-        }
     }
 }
 

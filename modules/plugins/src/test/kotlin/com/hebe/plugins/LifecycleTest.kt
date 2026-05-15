@@ -15,6 +15,7 @@ import com.hebe.config.PluginSignatureMode
 import com.hebe.plugins.host.HostFactory
 import com.hebe.plugins.signature.SignatureVerifier
 import io.mockk.mockk
+import java.nio.file.Files
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -26,7 +27,6 @@ import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
-import java.nio.file.Files
 
 class LifecycleTest {
     private val log = LoggerFactory.getLogger(LifecycleTest::class.java)
@@ -62,11 +62,12 @@ class LifecycleTest {
             pluginDir = tempDir,
             toolRegistry = toolRegistry,
             hostFactory = HostFactory({ null }, observer, log),
-            signatureVerifier = SignatureVerifier(
-                signatureMode = PluginSignatureMode.DISABLED,
-                trustedPublisherKeys = emptyList(),
-                log = log,
-            ),
+            signatureVerifier =
+                SignatureVerifier(
+                    signatureMode = PluginSignatureMode.DISABLED,
+                    trustedPublisherKeys = emptyList(),
+                    log = log,
+                ),
             observer = observer,
             pluginStore = store,
             secretResolver = { null },
@@ -110,7 +111,10 @@ class LifecycleTest {
             val registration = store.get("hello")!!
             assertTrue(registration.tools.any { it.fullName == "hello:say_hello" })
         } finally {
-            try { pf4j.stopPlugin("hello") } catch (_: Exception) {}
+            try {
+                pf4j.stopPlugin("hello")
+            } catch (_: Exception) {
+            }
         }
     }
 
@@ -170,10 +174,11 @@ class LifecycleTest {
             val namespacedTool = NamespacedTool(fakeTool, "hello")
             val wrapper = NamespacedToolWrapper(namespacedTool, ArgsRedactor.INSTANCE)
 
-            val testArgs = buildJsonObject {
-                put("name", "world")
-                put("extra", "value")
-            }
+            val testArgs =
+                buildJsonObject {
+                    put("name", "world")
+                    put("extra", "value")
+                }
             wrapper.invoke(testArgs, mockk(relaxed = true))
 
             assertEquals(1, capturedArgs.size)

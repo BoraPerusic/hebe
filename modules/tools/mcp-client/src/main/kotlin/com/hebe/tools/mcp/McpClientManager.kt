@@ -8,7 +8,7 @@ import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.client.StdioClientTransport
 import io.modelcontextprotocol.kotlin.sdk.client.mcpClient
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
-import kotlinx.coroutines.runBlocking
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
@@ -19,8 +19,8 @@ class McpClientManager(
     private val secretLookup: SecretLookup,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-    private val connectedClients = mutableMapOf<String, Client>()
-    private val serverConfigs = mutableMapOf<String, McpClientServerConfig>()
+    private val connectedClients = ConcurrentHashMap<String, Client>()
+    private val serverConfigs = ConcurrentHashMap<String, McpClientServerConfig>()
     private val toolFilter = McpToolFilter()
 
     @Suppress("TooGenericExceptionCaught")
@@ -28,10 +28,9 @@ class McpClientManager(
         for (config in serverConfigs) {
             try {
                 connectServer(config)
-            } catch (e: IllegalStateException) {
-                logger.error("Failed to connect to MCP server '{}': {}", config.name, e.message)
             } catch (e: RuntimeException) {
                 logger.error("Failed to connect to MCP server '{}': {}", config.name, e.message)
+                throw e
             }
         }
     }
@@ -48,7 +47,7 @@ class McpClientManager(
         connectedClients[config.name] = client
         serverConfigs[config.name] = config
 
-        val toolsResult = runBlocking { client.listTools() }
+        val toolsResult = client.listTools()
         logger.info("Server '{}' provides {} tools", config.name, toolsResult.tools.size)
 
         for (toolInfo in toolsResult.tools) {
@@ -108,8 +107,14 @@ class McpClientManager(
         )
     }
 
-    private fun buildEnvWithSecrets(envSecrets: Map<String, String>): Map<String, String> {
-        val env = System.getenv().filterKeys { it !in SENSITIVE_ENV_KEYS }
+    internal fun buildEnvWithSecrets(
+        envSecrets: Map<String, String>,
+        systemEnv: Map<String, String> = System.getenv(),
+    ): Map<String, String> {
+        val env =
+            systemEnv.filterKeys { envVar ->
+                SENSITIVE_ENV_KEYS.none { sensitiveKey -> envVar.contains(sensitiveKey) }
+            }
         val withSecrets =
             envSecrets.mapValues { (_, secretName) ->
                 secretLookup.secret(secretName)
@@ -118,11 +123,11 @@ class McpClientManager(
         return env + withSecrets
     }
 
-    fun disconnect(serverName: String) {
+    suspend fun disconnect(serverName: String) {
         val client = connectedClients.remove(serverName)
         if (client != null) {
             logger.info("Disconnecting MCP server '{}'", serverName)
-            runBlocking { client.close() }
+            client.close()
             registry
                 .list()
                 .filter { it.spec.name.startsWith("mcp_${serverName}_") }
@@ -130,8 +135,10 @@ class McpClientManager(
         }
     }
 
-    fun disconnectAll() {
-        connectedClients.keys.toList().forEach { disconnect(it) }
+    suspend fun disconnectAll() {
+        connectedClients.keys.toList().forEach { serverName ->
+            disconnect(serverName)
+        }
     }
 
     private companion object {

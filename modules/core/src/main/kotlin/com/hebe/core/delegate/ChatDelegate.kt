@@ -41,7 +41,7 @@ class ChatDelegate(
     private val compactor: PreemptivePruner,
     private val observer: com.hebe.api.Observer,
     private val systemPrompt: String,
-    private val tools: List<com.hebe.api.ToolSpec>,
+    private val toolsProvider: suspend (userMessage: String) -> List<com.hebe.api.ToolSpec>,
     private val modelName: String,
     private val sessionMutex: Mutex,
 ) : LoopDelegate {
@@ -112,7 +112,7 @@ class ChatDelegate(
                 model = modelName,
                 systemPrompt = reasoning.systemPrompt,
                 messages = chatMessages,
-                tools = tools,
+                tools = toolsProvider(reasoning.latestUserMessage),
                 temperature = 0.7,
                 maxTokens = null,
                 stream = true,

@@ -40,12 +40,4 @@ class McpToolFilter {
         )
         return result.distinct()
     }
-
-    companion object {
-        fun filterToolNames(
-            serverConfig: McpClientServerConfig,
-            allToolNames: List<String>,
-            userMessage: String,
-        ): List<String> = McpToolFilter().applicableTools(serverConfig, allToolNames, userMessage)
-    }
 }

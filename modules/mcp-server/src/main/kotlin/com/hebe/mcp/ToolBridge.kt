@@ -28,11 +28,12 @@ import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.slf4j.LoggerFactory
 
-@Suppress("UnusedParameter")
 private val logger = LoggerFactory.getLogger("com.hebe.mcp.ToolBridge")
 
 fun Server.registerToolsFromRegistry(
@@ -54,7 +55,7 @@ fun Server.registerToolsFromRegistry(
             description = tool.spec.description,
             inputSchema = toolSpecToMcpSchema(tool.spec.schema),
         ) { request ->
-            bridgeHandler(request, tool, dispatcher, sessionId)
+            bridgeHandler(request, dispatcher, sessionId)
         }
         count++
     }
@@ -62,16 +63,23 @@ fun Server.registerToolsFromRegistry(
     return count
 }
 
-private fun toolSpecToMcpSchema(schema: JsonObject): ToolSchema =
-    ToolSchema(
+private fun toolSpecToMcpSchema(schema: JsonObject): ToolSchema {
+    val requiredList =
+        schema["required"]?.let { element ->
+            if (element is JsonArray) {
+                element.mapNotNull { it.jsonPrimitive?.content }
+            } else {
+                emptyList()
+            }
+        } ?: emptyList()
+    return ToolSchema(
         properties = schema,
-        required = emptyList(),
+        required = requiredList,
     )
+}
 
-@Suppress("UnusedParameter", "EmptyFunctionBlock")
 private suspend fun bridgeHandler(
     request: CallToolRequest,
-    tool: Tool,
     dispatcher: ToolDispatcher,
     sessionId: String,
 ): CallToolResult {
@@ -120,7 +128,7 @@ private fun syntheticToolContext(sessionId: String): ToolContext =
         override val turnId: String = "mcp:turn-${System.currentTimeMillis()}"
         override val userId: String = "mcp:user"
         override val requestor: Channel = McpChannel
-        override val workspace: WorkspacePath = WorkspacePath("~/.hebe")
+        override val workspace: WorkspacePath = WorkspacePath(System.getProperty("user.home") + "/.hebe")
         override val approvalGate: ApprovalGate = McpApprovalGate
         override val observer: Observer = McpObserver
         override val secretLookup: SecretLookup =
@@ -145,8 +153,9 @@ private object McpChannel : Channel {
     override suspend fun shutdown() {}
 }
 
-@Suppress("EmptyFunctionBlock")
 private object McpApprovalGate : ApprovalGate {
+    private val logger = LoggerFactory.getLogger("com.hebe.mcp.McpApprovalGate")
+
     override fun requestIfNeeded(
         tool: Tool,
         args: JsonObject,
@@ -161,7 +170,13 @@ private object McpApprovalGate : ApprovalGate {
         turnId: String,
         channel: String,
         threadExtId: String?,
-    ): Boolean = false
+    ): Boolean {
+        logger.warn(
+            "MCPApprovalGate.awaitApproval called — returning false " +
+                "(approval-required tools are blocked via MCP)",
+        )
+        return false
+    }
 
     override fun resolve(
         approvalId: String,

@@ -8,7 +8,6 @@ import com.hebe.api.ToolSpec
 import io.modelcontextprotocol.kotlin.sdk.client.Client
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.slf4j.LoggerFactory
@@ -40,12 +39,10 @@ class RemoteTool(
     ): ToolResult =
         try {
             val result =
-                runBlocking {
-                    mcpClient.callTool(
-                        name = originalName,
-                        arguments = args.toMap(),
-                    )
-                }
+                mcpClient.callTool(
+                    name = originalName,
+                    arguments = args.toMap(),
+                )
             callToolResultToToolResult(result)
         } catch (e: Exception) {
             logger.error("Remote tool '{}' invocation failed: {}", name, e.message)
@@ -72,6 +69,8 @@ class RemoteTool(
 
     private fun JsonObject.toMap(): Map<String, Any?> =
         this.keys.associateWith { key ->
-            this[key]?.toString()
+            this[key]?.let { element ->
+                if (element is JsonPrimitive) element.content else element.toString()
+            }
         }
 }

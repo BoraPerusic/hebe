@@ -79,7 +79,7 @@ class HebeAgentTest {
             secretLookup = mockk(relaxed = true),
             secretStore = secretStore,
             systemPrompt = "assistant",
-            tools = emptyList(),
+            toolsProvider = { emptyList() },
             activeSkills = emptyList(),
         )
     }

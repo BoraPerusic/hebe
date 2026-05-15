@@ -1,7 +1,11 @@
 package com.hebe.gateway
 
+import com.hebe.config.McpServerConfig
 import com.hebe.config.SecretStoreProvider
 import com.hebe.config.WebChannelConfig
+import com.hebe.mcp.installMcpHttpTransport
+import com.hebe.tools.dispatch.ToolDispatcher
+import com.hebe.tools.dispatch.ToolRegistry
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpMethod
@@ -27,6 +31,12 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import org.slf4j.LoggerFactory
 
+data class McpDeps(
+    val config: McpServerConfig,
+    val registry: ToolRegistry,
+    val dispatcher: ToolDispatcher,
+)
+
 class Gateway {
     private val logger = LoggerFactory.getLogger(javaClass)
 
@@ -45,6 +55,7 @@ class Gateway {
     fun start(
         config: WebChannelConfig,
         secretStore: SecretStoreProvider,
+        mcpDeps: McpDeps?,
         configureRoutes: Routing.() -> Unit,
     ) {
         logger.info("starting gateway on {}:{}", config.bind, config.port)
@@ -55,6 +66,7 @@ class Gateway {
                 secretStore,
                 config.adminPasswordSecret,
                 "http://${config.bind}:${config.port}",
+                mcpDeps,
                 configureRoutes,
             )
         }.start(wait = true)
@@ -64,6 +76,7 @@ class Gateway {
         secretStore: SecretStoreProvider,
         passwordSecret: String = "web.password",
         allowedOrigin: String = "http://localhost:8765",
+        mcpDeps: McpDeps? = null,
         configureRoutes: Routing.() -> Unit,
     ) {
         install(CORS) {
@@ -75,6 +88,12 @@ class Gateway {
             allowMethod(HttpMethod.Post)
         }
         installAuth(secretStore, passwordSecret)
+
+        mcpDeps?.let { deps ->
+            val mcpServer = com.hebe.mcp.createHebeMcpServer()
+            installMcpHttpTransport(mcpServer, deps.config, deps.registry, deps.dispatcher, "gateway-http")
+        }
+
         routing {
             serveStaticFile("/", "index.html", ContentType.Text.Html)
             serveStaticFile("/static/style.css", "style.css", ContentType.Text.CSS)

@@ -85,4 +85,5 @@ interface ReasoningContext {
 interface Reasoning {
     val systemPrompt: String
     val activeSkills: List<String>
+    val latestUserMessage: String
 }

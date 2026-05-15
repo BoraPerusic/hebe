@@ -32,7 +32,11 @@ class GatewayTest {
     @Test
     fun `health endpoint returns 200 without authentication`() =
         testApplication {
-            application { makeGateway().run { configureApplication(makeSecretStore()) {} } }
+            application {
+                makeGateway().run {
+                    configureApplication(makeSecretStore()) {}
+                }
+            }
 
             val response = client.get("/health")
             assertEquals(HttpStatusCode.OK, response.status)
@@ -41,7 +45,11 @@ class GatewayTest {
     @Test
     fun `api status requires authentication — no credentials returns 401`() =
         testApplication {
-            application { makeGateway().run { configureApplication(makeSecretStore()) {} } }
+            application {
+                makeGateway().run {
+                    configureApplication(makeSecretStore()) {}
+                }
+            }
 
             val response = client.get("/api/status")
             assertEquals(HttpStatusCode.Unauthorized, response.status)
@@ -50,7 +58,11 @@ class GatewayTest {
     @Test
     fun `api status returns 200 with correct credentials`() =
         testApplication {
-            application { makeGateway().run { configureApplication(makeSecretStore()) {} } }
+            application {
+                makeGateway().run {
+                    configureApplication(makeSecretStore()) {}
+                }
+            }
 
             val response =
                 client.get("/api/status") {
@@ -62,7 +74,11 @@ class GatewayTest {
     @Test
     fun `api status returns 401 with wrong password`() =
         testApplication {
-            application { makeGateway().run { configureApplication(makeSecretStore()) {} } }
+            application {
+                makeGateway().run {
+                    configureApplication(makeSecretStore()) {}
+                }
+            }
 
             val response =
                 client.get("/api/status") {
@@ -74,7 +90,11 @@ class GatewayTest {
     @Test
     fun `api status returns 401 when no secret is configured`() =
         testApplication {
-            application { makeGateway().run { configureApplication(makeSecretStore(returns = null)) {} } }
+            application {
+                makeGateway().run {
+                    configureApplication(makeSecretStore(returns = null)) {}
+                }
+            }
 
             val response =
                 client.get("/api/status") {
@@ -92,7 +112,11 @@ class GatewayTest {
             }
             gateway.setLlmHealthProvider { "https://api.example.com" to true }
 
-            application { gateway.run { configureApplication(makeSecretStore()) {} } }
+            application {
+                gateway.run {
+                    configureApplication(makeSecretStore()) {}
+                }
+            }
 
             val response =
                 client.get("/api/status") {

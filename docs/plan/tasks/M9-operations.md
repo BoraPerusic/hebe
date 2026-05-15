@@ -151,11 +151,150 @@ Generate and install a system service unit. Three platforms in v1:
 
 ---
 
+## M9.T9 — `hebe run` full agent assembly
+
+**Status**: pending  
+**Size**: L  
+**Depends on**: M2.T6 (dispatcher), M3.T1 (policy chain), M4 (builtin tools), M5.T3 (gateway), M6.T13 (plugin lifecycle), M7.T4 (MCP client), M8.T9 (scheduler)  
+**Blocks**: M9.T3 (daemon wrapper goes on top of the assembled agent)
+
+### Goal
+
+Implement `RunCommand` — wire every module's component into a single running agent. This is the composition root: the one place that constructs everything and starts it.
+
+### Files to create / modify
+
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/commands/Run.kt` (edit — implement)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/AgentFactory.kt` (new — pure assembly, no I/O)
+
+### Detailed work
+
+1. **Load infrastructure** (all from config + `workspaceRoot = ~/.hebe`):
+   - `Db.open(workspaceRoot)` → `SqliteMemoryStore`
+   - `SigningKey.bootstrap(secretStore)` → shared Ed25519 private key
+   - `Receipts(receiptsDir, signingKey)`
+   - `WorkspaceSeeder.seedIfMissing(workspaceRoot)`
+
+2. **Build tool stack**:
+   - Create `ToolRegistry`; register all builtin tools (`FileSystem*`, `Shell`, `Http`, `WebSearch`, `Memory*`, `Schedule`, `Git`, `AskUser`)
+   - `PolicyChain.standard(config, workspaceRoot)` as validators
+   - `ApprovalGate` + `PendingApprovalsRepo`
+   - `ToolDispatcher(registry, validators, approvalGate, memory, observer, leakDetector, receipts)`
+
+3. **Connect MCP client** (must happen before `HebeAgent` is constructed so remote tools are in the registry):
+   ```kotlin
+   val mcpClientManager = McpClientManager(registry, secretLookup)
+   mcpClientManager.connect(config.mcp.client.servers)
+   ```
+
+4. **Build `toolsProvider`** that applies per-turn MCP filter (completes M7.T5):
+   ```kotlin
+   val toolsProvider: suspend (String) -> List<ToolSpec> = { message ->
+       val local = registry.list().map { it.spec }
+       val remote = config.mcp.client.servers.flatMap { srv ->
+           mcpClientManager.toolsForMessage(srv.name, message)
+               .mapNotNull { name -> registry.get(name)?.spec }
+       }
+       local + remote
+   }
+   ```
+
+5. **Construct `HebeAgent`** with `toolsProvider` and all other deps.
+
+6. **Load + start plugins** via `HebePluginManager`; plugins may register additional tools into the registry.
+
+7. **Wire channels + Gateway**:
+   - Construct enabled channels (`CliChannel`, `WebChannel`, `TelegramChannel` per config)
+   - `ChannelWiring.registerChannels(channelManager, ...)`
+   - `Gateway.start(config.channels.web, secretStore, mcpServerConfig, registry, dispatcher, configureRoutes = { channelWiring.applyToGateway(this) })`
+
+8. **Start `ChannelManagerImpl`** in a coroutine scope — this begins accepting messages and calling `hebeAgent.handleMessage(msg)` for each.
+
+9. **Wire MCP server** (HTTP): already handled via `Gateway.start(mcpServerConfig = config.mcp.server, ...)`.
+
+### Tests / verification
+
+- Integration test: start the agent with a `MockLlmProvider`, send a message via `InjectChannel`, assert a reply.
+
+### Acceptance criteria
+
+- ✅ `hebe run` starts and accepts chat turns on all configured channels.
+- ✅ `toolsProvider` includes both local and MCP-filtered remote tools per turn (T5 complete).
+- ✅ Shutdown (signal or in-test) disconnects MCP clients and drains the channel manager cleanly.
+
+### Pitfalls
+
+- Plugin loading must happen after `ToolRegistry` is created (plugins register into it) but before `HebeAgent` is constructed (so the agent sees plugin tools).
+- MCP client connect is async; call `connect()` with a timeout — don't let a slow external server delay startup indefinitely.
+
+---
+
+## M9.T10 — MCP client lifecycle: reconnect + `hebe doctor` health
+
+**Status**: pending  
+**Size**: M  
+**Depends on**: M9.T9, M7.T4  
+**Blocks**: nothing direct
+
+### Goal
+
+Reconnect with exponential backoff on transport disconnect; surface MCP connection status in `hebe doctor`.
+
+### Files to create / modify
+
+- `modules/tools/mcp-client/src/main/kotlin/com/hebe/tools/mcp/McpClientManager.kt` (edit — add reconnect loop)
+- `modules/tools/mcp-client/src/main/kotlin/com/hebe/tools/mcp/McpServerStatus.kt` (new — status type)
+- `modules/cli-app/src/main/kotlin/com/hebe/cli/doctor/Checks.kt` (edit — add MCP check)
+- Tests
+
+### Detailed work
+
+1. **`McpServerStatus`** sealed type:
+   ```kotlin
+   sealed interface McpServerStatus {
+       data object Connected : McpServerStatus
+       data class Reconnecting(val attempt: Int, val nextRetryMs: Long) : McpServerStatus
+       data class Failed(val reason: String) : McpServerStatus
+   }
+   ```
+   Store in a `ConcurrentHashMap<String, McpServerStatus>` alongside `connectedClients`.
+
+2. **Reconnect loop** — after `connectServer()` succeeds, launch a background coroutine:
+   - Monitor for client disconnection (transport close event or failed `listTools` ping).
+   - On disconnect: remove tools from registry; retry with exponential backoff starting at 5 s, doubling up to 5 min cap, giving up after 1 hour total.
+   - On reconnect success: re-register tools; update status to `Connected`.
+   - On permanent failure: set `Failed`; log at ERROR.
+
+3. **`McpClientManager.connectionStatus(): Map<String, McpServerStatus>`** — public method for health checks.
+
+4. **`hebe doctor` MCP check**: iterate `connectionStatus()`:
+   - `Connected` → Pass
+   - `Reconnecting` → Warn (include attempt count and next retry)
+   - `Failed` → Fail (include reason; hint: check command path and credentials)
+
+### Tests / verification
+
+- Mock a `Client` that closes its transport after connection — assert `McpServerStatus.Reconnecting` transitions to `Connected` on a second mock server.
+- After 1-hour backoff exhausted (time-accelerated via `TestCoroutineScheduler`) → `Failed`.
+- `hebe doctor` outputs Warn row when server is reconnecting.
+
+### Acceptance criteria
+
+- ✅ Disconnect → reconnect with capped exponential backoff (max 5 min, give up after 1 h).
+- ✅ `McpServerStatus` exposed via `connectionStatus()`.
+- ✅ `hebe doctor` reflects MCP connection health per server.
+
+### References
+
+- M7 task brief §T4 (`tasks/M7-mcp.md`)
+
+---
+
 ## M9.T3 — Daemon mode + PID file + graceful shutdown
 
 **Status**: pending  
 **Size**: S  
-**Depends on**: M2.T13  
+**Depends on**: M9.T9  
 **Blocks**: M9.T2 (service runs in daemon mode)
 
 ### Goal

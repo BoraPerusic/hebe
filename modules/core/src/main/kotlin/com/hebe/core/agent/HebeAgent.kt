@@ -42,7 +42,7 @@ class HebeAgent(
     private val secretLookup: SecretLookup,
     private val secretStore: SecretStoreProvider,
     private val systemPrompt: String,
-    private val tools: List<ToolSpec>,
+    private val toolsProvider: suspend (userMessage: String) -> List<ToolSpec>,
     private val activeSkills: List<String>,
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
@@ -101,7 +101,7 @@ class HebeAgent(
                 compactor = compactor,
                 observer = observer,
                 systemPrompt = systemPrompt,
-                tools = tools,
+                toolsProvider = toolsProvider,
                 modelName = modelName,
                 sessionMutex = sessionMutex,
             )
@@ -110,6 +110,7 @@ class HebeAgent(
             object : Reasoning {
                 override val systemPrompt: String = this@HebeAgent.systemPrompt
                 override val activeSkills: List<String> = this@HebeAgent.activeSkills
+                override val latestUserMessage: String = msg.content
             }
 
         val ctx =

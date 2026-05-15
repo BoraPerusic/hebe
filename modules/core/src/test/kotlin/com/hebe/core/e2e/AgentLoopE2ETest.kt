@@ -55,11 +55,14 @@ class AgentLoopE2ETest {
         coEvery { memory.loadContext(any()) } returns emptyList()
     }
 
-    private fun reasoning(systemPrompt: String = "assistant") =
-        object : com.hebe.api.Reasoning {
-            override val systemPrompt = systemPrompt
-            override val activeSkills = listOf<String>()
-        }
+    private fun reasoning(
+        systemPrompt: String = "assistant",
+        latestUserMessage: String = "",
+    ) = object : com.hebe.api.Reasoning {
+        override val systemPrompt = systemPrompt
+        override val activeSkills = listOf<String>()
+        override val latestUserMessage = latestUserMessage
+    }
 
     private fun ctx(turnId: String = "t1") =
         object : com.hebe.api.ReasoningContext {
@@ -144,7 +147,7 @@ class AgentLoopE2ETest {
                     compactor = compactor,
                     observer = observer,
                     systemPrompt = "you are helpful",
-                    tools = listOf(echoTool.spec),
+                    toolsProvider = { listOf(echoTool.spec) },
                     modelName = "test-model",
                     sessionMutex = Mutex(),
                 )
@@ -195,7 +198,7 @@ class AgentLoopE2ETest {
                     compactor = compactor,
                     observer = observer,
                     systemPrompt = "you are helpful",
-                    tools = emptyList(),
+                    toolsProvider = { emptyList() },
                     modelName = "test-model",
                     sessionMutex = Mutex(),
                 )

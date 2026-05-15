@@ -56,7 +56,7 @@ class ChatDelegateTest {
                 compactor = compactor,
                 observer = observer,
                 systemPrompt = "you are helpful",
-                tools = emptyList(),
+                toolsProvider = { emptyList() },
                 modelName = "test-model",
                 sessionMutex = Mutex(),
             )
@@ -73,6 +73,7 @@ class ChatDelegateTest {
         object : com.hebe.api.Reasoning {
             override val systemPrompt = "you are helpful"
             override val activeSkills = listOf<String>()
+            override val latestUserMessage = ""
         }
 
     private fun ctx(turnId: String = "turn1") =

@@ -23,9 +23,10 @@ fun Application.installMcpHttpTransport(
         return
     }
 
+    server.registerToolsFromRegistry(registry, config, dispatcher, sessionId)
+
     routing {
         mcpStreamableHttp(path = "/mcp") {
-            server.registerToolsFromRegistry(registry, config, dispatcher, sessionId)
             server
         }
     }
