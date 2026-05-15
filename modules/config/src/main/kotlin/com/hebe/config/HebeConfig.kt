@@ -126,6 +126,7 @@ data class McpServerConfig(
     val stdio: Boolean = true,
     val httpBind: String = "",
     val httpPort: Int = 0,
+    val exposeHighRisk: Boolean = false,
 )
 
 @Serializable

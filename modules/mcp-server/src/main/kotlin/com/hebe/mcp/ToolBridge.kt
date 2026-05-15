@@ -1,0 +1,192 @@
+package com.hebe.mcp
+
+import com.hebe.api.ApprovalGate
+import com.hebe.api.ApprovalStatus
+import com.hebe.api.Channel
+import com.hebe.api.ChannelHealth
+import com.hebe.api.Observer
+import com.hebe.api.ObserverEvent
+import com.hebe.api.OutboundMessage
+import com.hebe.api.ParsedToolCall
+import com.hebe.api.ReplyContext
+import com.hebe.api.RiskLevel
+import com.hebe.api.SecretLookup
+import com.hebe.api.Span
+import com.hebe.api.Tool
+import com.hebe.api.ToolContext
+import com.hebe.api.ToolResult
+import com.hebe.api.workspace.WorkspacePath
+import com.hebe.config.McpServerConfig
+import com.hebe.tools.dispatch.DispatchOutcome
+import com.hebe.tools.dispatch.ToolDispatcher
+import com.hebe.tools.dispatch.ToolRegistry
+import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolRequest
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import org.slf4j.LoggerFactory
+
+@Suppress("UnusedParameter")
+private val logger = LoggerFactory.getLogger("com.hebe.mcp.ToolBridge")
+
+fun Server.registerToolsFromRegistry(
+    registry: ToolRegistry,
+    config: McpServerConfig,
+    dispatcher: ToolDispatcher,
+    sessionId: String,
+): Int {
+    var count = 0
+    val toolList = registry.list()
+    for (tool in toolList) {
+        if (tool.risk == RiskLevel.High && !config.exposeHighRisk) {
+            logger.debug("Skipping high-risk tool {} (exposeHighRisk=false)", tool.spec.name)
+            continue
+        }
+
+        addTool(
+            name = tool.spec.name,
+            description = tool.spec.description,
+            inputSchema = toolSpecToMcpSchema(tool.spec.schema),
+        ) { request ->
+            bridgeHandler(request, tool, dispatcher, sessionId)
+        }
+        count++
+    }
+    logger.info("Registered {}/{} tools from registry (exposeHighRisk={})", count, toolList.size, config.exposeHighRisk)
+    return count
+}
+
+private fun toolSpecToMcpSchema(schema: JsonObject): ToolSchema =
+    ToolSchema(
+        properties = schema,
+        required = emptyList(),
+    )
+
+@Suppress("UnusedParameter", "EmptyFunctionBlock")
+private suspend fun bridgeHandler(
+    request: CallToolRequest,
+    tool: Tool,
+    dispatcher: ToolDispatcher,
+    sessionId: String,
+): CallToolResult {
+    val args = request.arguments ?: JsonObject(buildJsonObject { })
+
+    val call =
+        ParsedToolCall(
+            id = "mcp-${System.currentTimeMillis()}",
+            name = request.name,
+            args = args,
+        )
+
+    val ctx = syntheticToolContext(sessionId)
+
+    val outcome = dispatcher.dispatch(call, ctx)
+
+    return when (outcome) {
+        is DispatchOutcome.Result -> toolResultToMcpResult(outcome.result)
+    }
+}
+
+private fun toolResultToMcpResult(result: ToolResult): CallToolResult =
+    when (result) {
+        is ToolResult.Ok -> {
+            val content = TextContent(text = result.content.toString())
+            CallToolResult(
+                content = listOf(content),
+                isError = false,
+            )
+        }
+        is ToolResult.Err ->
+            CallToolResult(
+                content = listOf(TextContent(text = result.message)),
+                isError = true,
+            )
+        is ToolResult.NeedsApproval ->
+            CallToolResult(
+                content = listOf(TextContent(text = "Approval required: ${result.prompt}")),
+                isError = true,
+            )
+    }
+
+private fun syntheticToolContext(sessionId: String): ToolContext =
+    object : ToolContext {
+        override val sessionId: String = sessionId
+        override val turnId: String = "mcp:turn-${System.currentTimeMillis()}"
+        override val userId: String = "mcp:user"
+        override val requestor: Channel = McpChannel
+        override val workspace: WorkspacePath = WorkspacePath("~/.hebe")
+        override val approvalGate: ApprovalGate = McpApprovalGate
+        override val observer: Observer = McpObserver
+        override val secretLookup: SecretLookup =
+            object : SecretLookup {
+                override fun secret(name: String): String? = null
+            }
+    }
+
+@Suppress("EmptyFunctionBlock")
+private object McpChannel : Channel {
+    override val name: String = "mcp"
+
+    override suspend fun start(scope: CoroutineScope): Flow<com.hebe.api.IncomingMessage> = flow { }
+
+    override suspend fun reply(
+        ctx: ReplyContext,
+        msg: OutboundMessage,
+    ) {}
+
+    override suspend fun healthCheck(): ChannelHealth = ChannelHealth.Up
+
+    override suspend fun shutdown() {}
+}
+
+@Suppress("EmptyFunctionBlock")
+private object McpApprovalGate : ApprovalGate {
+    override fun requestIfNeeded(
+        tool: Tool,
+        args: JsonObject,
+        turnId: String,
+        channel: String,
+        threadExtId: String?,
+    ): Flow<ApprovalStatus> = flow {}
+
+    override suspend fun awaitApproval(
+        tool: Tool,
+        args: JsonObject,
+        turnId: String,
+        channel: String,
+        threadExtId: String?,
+    ): Boolean = false
+
+    override fun resolve(
+        approvalId: String,
+        approved: Boolean,
+    ): Boolean = false
+}
+
+@Suppress("EmptyFunctionBlock")
+private object McpObserver : Observer {
+    override fun event(e: ObserverEvent) {}
+
+    override fun span(
+        name: String,
+        attrs: Map<String, Any>,
+    ): Span = McpSpan
+}
+
+@Suppress("EmptyFunctionBlock")
+private object McpSpan : Span {
+    override fun setAttribute(
+        key: String,
+        value: Any,
+    ) {}
+
+    override fun recordError(t: Throwable) {}
+
+    override fun close() {}
+}

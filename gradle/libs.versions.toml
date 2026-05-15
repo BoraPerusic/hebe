@@ -5,7 +5,8 @@ serialization       = "1.11.0"
 datetime            = "0.7.1"
 koog                = "0.8.0"
 ktor                = "3.2.3"
-mcp                 = "0.11.0"
+mcp                 = "0.12.0"
+kotlinx-io          = "0.8.2"
 sqliteJdbc          = "3.53.0.0"
 sqliteVec           = "0.1.8"
 flyway              = "11.20.3"
@@ -56,6 +57,7 @@ ktor-client-test-host     = { module = "io.ktor:ktor-client-test-host",         
 ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation",     version.ref = "ktor" }
 ktor-client-logging       = { module = "io.ktor:ktor-client-logging",                       version.ref = "ktor" }
 mcp-kotlin-sdk            = { module = "io.modelcontextprotocol:kotlin-sdk",                version.ref = "mcp" }
+kotlinx-io                = { module = "org.jetbrains.kotlinx:kotlinx-io-core-jvm",           version.ref = "kotlinx-io" }
 sqlite-jdbc               = { module = "org.xerial:sqlite-jdbc",                            version.ref = "sqliteJdbc" }
 flyway-core               = { module = "org.flywaydb:flyway-core",                          version.ref = "flyway" }
 telegrambots              = { module = "org.telegram:telegrambots",                         version.ref = "telegram" }

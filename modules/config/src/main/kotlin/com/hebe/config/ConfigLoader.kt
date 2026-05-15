@@ -180,6 +180,18 @@ class ConfigLoader {
         }
     }
 
+    private fun getStringMap(
+        table: TomlTable,
+        key: String,
+    ): Map<String, String> {
+        val value = table.get(key)
+        return if (value is TomlTable) {
+            value.keySet().associateWith { k -> value.getString(k) ?: "" }
+        } else {
+            emptyMap()
+        }
+    }
+
     private fun parseScheduler(table: TomlTable?): SchedulerSection {
         if (table == null) return SchedulerSection()
         return SchedulerSection(
@@ -273,14 +285,17 @@ class ConfigLoader {
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun parseMcpClientServerFromTable(t: TomlTable): McpClientServerConfig =
-        McpClientServerConfig(
+    private fun parseMcpClientServerFromTable(t: TomlTable): McpClientServerConfig {
+        val commandList = getStringList(t, "command")
+        val envSecretsMap = getStringMap(t, "secrets")
+        return McpClientServerConfig(
             name = t.getString("name") ?: "",
             transport = t.getString("transport") ?: "stdio",
-            command = emptyList(),
-            envSecrets = emptyMap(),
-            alwaysTools = emptyList(),
-            dynamicTools = emptyList(),
-            dynamicKeywords = emptyList(),
+            command = commandList,
+            envSecrets = envSecretsMap,
+            alwaysTools = getStringList(t, "always_tools"),
+            dynamicTools = getStringList(t, "dynamic_tools"),
+            dynamicKeywords = getStringList(t, "dynamic_keywords"),
         )
+    }
 }

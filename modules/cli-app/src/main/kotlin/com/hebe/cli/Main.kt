@@ -66,8 +66,37 @@ class RunCommand : CliktCommand(name = "run") {
 }
 
 class McpServeCommand : CliktCommand(name = "mcp serve") {
+    private val configPath =
+        java.nio.file.Path.of(System.getProperty("user.home"), ".hebe", "config.toml")
+
     override fun run() {
-        echo("Not yet implemented: hebe mcp serve")
+        val hebeConfig = loadConfig()
+        val mcpConfig = hebeConfig.mcp.server
+        if (!mcpConfig.stdio) {
+            echo("Stdio MCP server disabled in config")
+            return
+        }
+
+        echo("Starting Hebe MCP Server (stdio mode)...")
+        runBlocking<Unit> {
+            com.hebe.mcp.runMcpStdioServer(hebeConfig)
+        }
+    }
+
+    private fun loadConfig(): com.hebe.config.HebeConfig {
+        return if (java.nio.file.Files.exists(configPath)) {
+            com.hebe.config.ConfigLoader().load(configPath).let { result ->
+                when (result) {
+                    is com.hebe.config.ConfigResult.Ok -> result.value
+                    is com.hebe.config.ConfigResult.Error -> {
+                        System.err.println("Warning: failed to load config, using defaults")
+                        com.hebe.config.HebeConfig.default()
+                    }
+                }
+            }
+        } else {
+            com.hebe.config.HebeConfig.default()
+        }
     }
 }
 
