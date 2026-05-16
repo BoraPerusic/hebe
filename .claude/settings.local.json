@@ -86,7 +86,8 @@
       "Bash(./gradlew *)",
       "Bash(just lint *)",
       "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(item['text']\\) for item in data if item['type']=='text']\")",
-      "Bash(grep *)"
+      "Bash(grep *)",
+      "Bash(xargs cat -n)"
     ]
   }
 }

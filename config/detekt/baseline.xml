@@ -1,4 +1,195 @@
 <?xml version="1.0" encoding="utf-8"?>
-<VersionCatalogReport>
-    <MinimalMatches />
-</VersionCatalogReport>
+<detekt>
+  <SmellsSchema>
+    <File name="modules/scheduler/src/main/kotlin/com/hebe/scheduler/JobRepo.kt">
+      <Issue line="48" column="31" message="MagicNumber"/>
+      <Issue line="80" column="33" message="MagicNumber"/>
+      <Issue line="81" column="30" message="MagicNumber"/>
+      <Issue line="102" column="33" message="MagicNumber"/>
+      <Issue line="103" column="30" message="MagicNumber"/>
+      <Issue line="121" column="38" message="MagicNumber"/>
+      <Issue line="123" column="39" message="MagicNumber"/>
+      <Issue line="128" column="41" message="MagicNumber"/>
+      <Issue line="129" column="45" message="MagicNumber"/>
+      <Issue line="130" column="44" message="MagicNumber"/>
+      <Issue line="131" column="45" message="MagicNumber"/>
+      <Issue line="132" column="41" message="MagicNumber"/>
+      <Issue line="133" column="44" message="MagicNumber"/>
+      <Issue line="144" column="31" message="MagicNumber"/>
+      <Issue line="145" column="37" message="MagicNumber"/>
+      <Issue line="146" column="35" message="MagicNumber"/>
+      <Issue line="147" column="37" message="MagicNumber"/>
+      <Issue line="148" column="36" message="MagicNumber"/>
+      <Issue line="149" column="35" message="MagicNumber"/>
+      <Issue line="150" column="29" message="MagicNumber"/>
+    </File>
+    <File name="modules/scheduler/src/main/kotlin/com/hebe/scheduler/Scheduler.kt">
+      <Issue line="29" column="22" message="TooGenericExceptionCaught"/>
+      <Issue line="35" column="2" message="NewLineAtEndOfFile"/>
+    </File>
+    <File name="modules/scheduler/src/main/kotlin/com/hebe/scheduler/SchedulerInternals.kt">
+      <Issue line="9" column="8" message="MatchingDeclarationName"/>
+      <Issue line="27" column="2" message="NewLineAtEndOfFile"/>
+    </File>
+    <File name="modules/scheduler/src/main/kotlin/com/hebe/scheduler/cron/Cron.kt">
+      <Issue line="17" column="2" message="NewLineAtEndOfFile"/>
+    </File>
+    <File name="modules/scheduler/src/main/kotlin/com/hebe/scheduler/cron/CronParser.kt">
+      <Issue line="52" column="32" message="MagicNumber"/>
+      <Issue line="53" column="47" message="MagicNumber"/>
+      <Issue line="54" column="45" message="MagicNumber"/>
+      <Issue line="55" column="44" message="MagicNumber"/>
+      <Issue line="56" column="39" message="MagicNumber"/>
+      <Issue line="56" column="46" message="MagicNumber"/>
+      <Issue line="57" column="37" message="MagicNumber"/>
+      <Issue line="57" column="44" message="MagicNumber"/>
+      <Issue line="110" column="37" message="MagicNumber"/>
+      <Issue line="111" column="39" message="MagicNumber"/>
+      <Issue line="130" column="12" message="MagicNumber"/>
+      <Issue line="130" column="18" message="MagicNumber"/>
+      <Issue line="130" column="23" message="MagicNumber"/>
+      <Issue line="77" column="42" message="UnusedParameter"/>
+      <Issue line="77" column="52" message="UnusedParameter"/>
+      <Issue line="77" column="62" message="UnusedParameter"/>
+    </File>
+    <File name="modules/scheduler/src/main/kotlin/com/hebe/scheduler/maintenance/DailyDigest.kt">
+      <Issue line="73" column="18" message="TooGenericExceptionCaught"/>
+      <Issue line="298" column="2" message="NewLineAtEndOfFile"/>
+      <Issue line="224" column="1" message="MaxLineLength"/>
+      <Issue line="148" column="49" message="MagicNumber"/>
+      <Issue line="149" column="52" message="MagicNumber"/>
+      <Issue line="150" column="50" message="MagicNumber"/>
+      <Issue line="178" column="25" message="MagicNumber"/>
+      <Issue line="203" column="51" message="MagicNumber"/>
+      <Issue line="204" column="55" message="MagicNumber"/>
+      <Issue line="250" column="52" message="MagicNumber"/>
+      <Issue line="252" column="35" message="MagicNumber"/>
+      <Issue line="253" column="61" message="MagicNumber"/>
+      <Issue line="255" column="29" message="MagicNumber"/>
+      <Issue line="255" column="59" message="MagicNumber"/>
+      <Issue line="260" column="39" message="MagicNumber"/>
+      <Issue line="269" column="31" message="MagicNumber"/>
+      <Issue line="276" column="37" message="MagicNumber"/>
+    </File>
+    <File name="modules/scheduler/src/main/kotlin/com/hebe/scheduler/maintenance/EmbeddingRefresh.kt">
+      <Issue line="47" column="26" message="TooGenericExceptionCaught"/>
+      <Issue line="52" column="18" message="TooGenericExceptionCaught"/>
+      <Issue line="184" column="2" message="NewLineAtEndOfFile"/>
+      <Issue line="87" column="9" message="ForbiddenComment"/>
+      <Issue line="77" column="52" message="MagicNumber"/>
+      <Issue line="94" column="79" message="MagicNumber"/>
+      <Issue line="117" column="61" message="MagicNumber"/>
+      <Issue line="120" column="104" message="MagicNumber"/>
+      <Issue line="127" column="50" message="MagicNumber"/>
+      <Issue line="129" column="38" message="MagicNumber"/>
+      <Issue line="147" column="27" message="MagicNumber"/>
+      <Issue line="166" column="28" message="MagicNumber"/>
+    </File>
+    <File name="modules/scheduler/src/main/kotlin/com/hebe/scheduler/maintenance/FactExtractor.kt">
+      <Issue line="58" column="26" message="TooGenericExceptionCaught"/>
+      <Issue line="63" column="18" message="TooGenericExceptionCaught"/>
+      <Issue line="161" column="18" message="TooGenericExceptionCaught"/>
+      <Issue line="226" column="2" message="NewLineAtEndOfFile"/>
+      <Issue line="130" column="1" message="MaxLineLength"/>
+      <Issue line="70" column="48" message="MagicNumber"/>
+      <Issue line="70" column="55" message="MagicNumber"/>
+      <Issue line="98" column="52" message="MagicNumber"/>
+      <Issue line="99" column="50" message="MagicNumber"/>
+      <Issue line="196" column="84" message="MagicNumber"/>
+      <Issue line="203" column="96" message="MagicNumber"/>
+      <Issue line="167" column="49" message="UnusedParameter"/>
+    </File>
+    <File name="modules/scheduler/src/main/kotlin/com/hebe/scheduler/maintenance/Heartbeat.kt">
+      <Issue line="92" column="18" message="TooGenericExceptionCaught"/>
+      <Issue line="193" column="2" message="NewLineAtEndOfFile"/>
+      <Issue line="88" column="75" message="MagicNumber"/>
+    </File>
+    <File name="modules/scheduler/src/main/kotlin/com/hebe/scheduler/maintenance/StuckJobDetector.kt">
+      <Issue line="43" column="26" message="TooGenericExceptionCaught"/>
+      <Issue line="48" column="18" message="TooGenericExceptionCaught"/>
+      <Issue line="175" column="2" message="NewLineAtEndOfFile"/>
+      <Issue line="55" column="47" message="MagicNumber"/>
+      <Issue line="55" column="52" message="MagicNumber"/>
+      <Issue line="72" column="51" message="MagicNumber"/>
+      <Issue line="73" column="56" message="MagicNumber"/>
+      <Issue line="74" column="55" message="MagicNumber"/>
+      <Issue line="75" column="49" message="MagicNumber"/>
+      <Issue line="76" column="57" message="MagicNumber"/>
+      <Issue line="99" column="30" message="MagicNumber"/>
+      <Issue line="124" column="33" message="MagicNumber"/>
+      <Issue line="125" column="30" message="MagicNumber"/>
+      <Issue line="16" column="17" message="UnusedPrivateProperty"/>
+    </File>
+    <File name="modules/scheduler/src/main/kotlin/com/hebe/scheduler/maintenance/Summariser.kt">
+      <Issue line="58" column="26" message="TooGenericExceptionCaught"/>
+      <Issue line="63" column="18" message="TooGenericExceptionCaught"/>
+      <Issue line="220" column="2" message="NewLineAtEndOfFile"/>
+      <Issue line="152" column="1" message="MaxLineLength"/>
+      <Issue line="70" column="48" message="MagicNumber"/>
+      <Issue line="70" column="55" message="MagicNumber"/>
+      <Issue line="101" column="33" message="MagicNumber"/>
+      <Issue line="117" column="69" message="MagicNumber"/>
+      <Issue line="117" column="76" message="MagicNumber"/>
+      <Issue line="136" column="52" message="MagicNumber"/>
+      <Issue line="137" column="50" message="MagicNumber"/>
+      <Issue line="209" column="29" message="MagicNumber"/>
+      <Issue line="26" column="17" message="UnusedPrivateProperty"/>
+    </File>
+    <File name="modules/scheduler/src/test/kotlin/com/hebe/scheduler/JobRepoTest.kt">
+      <Issue line="68" column="3" message="NewLineAtEndOfFile"/>
+    </File>
+    <File name="modules/scheduler/src/test/kotlin/com/hebe/scheduler/RoutinesEngineTest.kt">
+      <Issue line="150" column="2" message="NewLineAtEndOfFile"/>
+      <Issue line="27" column="1" message="MaxLineLength"/>
+      <Issue line="40" column="1" message="MaxLineLength"/>
+      <Issue line="54" column="1" message="MaxLineLength"/>
+      <Issue line="67" column="1" message="MaxLineLength"/>
+      <Issue line="110" column="1" message="MaxLineLength"/>
+    </File>
+    <File name="modules/scheduler/src/test/kotlin/com/hebe/scheduler/cron/CronParserTest.kt">
+      <Issue line="144" column="3" message="NewLineAtEndOfFile"/>
+    </File>
+    <File name="modules/scheduler/src/test/kotlin/com/hebe/scheduler/maintenance/DailyDigestTest.kt">
+      <Issue line="85" column="2" message="NewLineAtEndOfFile"/>
+      <Issue line="55" column="1" message="MaxLineLength"/>
+    </File>
+    <File name="modules/scheduler/src/test/kotlin/com/hebe/scheduler/maintenance/EmbeddingRefreshTest.kt">
+      <Issue line="39" column="3" message="NewLineAtEndOfFile"/>
+      <Issue line="13" column="1" message="MaxLineLength"/>
+    </File>
+    <File name="modules/scheduler/src/test/kotlin/com/hebe/scheduler/maintenance/FactExtractorTest.kt">
+      <Issue line="83" column="3" message="NewLineAtEndOfFile"/>
+      <Issue line="11" column="1" message="MaxLineLength"/>
+      <Issue line="14" column="1" message="MaxLineLength"/>
+      <Issue line="22" column="1" message="MaxLineLength"/>
+      <Issue line="27" column="1" message="MaxLineLength"/>
+      <Issue line="31" column="1" message="MaxLineLength"/>
+    </File>
+    <File name="modules/scheduler/src/test/kotlin/com/hebe/scheduler/maintenance/HeartbeatTest.kt">
+      <Issue line="13" column="103" message="EmptyFunctionBlock"/>
+      <Issue line="14" column="139" message="EmptyFunctionBlock"/>
+      <Issue line="36" column="55" message="EmptyFunctionBlock"/>
+      <Issue line="41" column="56" message="EmptyFunctionBlock"/>
+      <Issue line="42" column="44" message="EmptyFunctionBlock"/>
+      <Issue line="43" column="26" message="EmptyFunctionBlock"/>
+      <Issue line="148" column="3" message="NewLineAtEndOfFile"/>
+      <Issue line="11" column="1" message="MaxLineLength"/>
+      <Issue line="14" column="1" message="MaxLineLength"/>
+      <Issue line="26" column="1" message="MaxLineLength"/>
+      <Issue line="30" column="1" message="MaxLineLength"/>
+      <Issue line="31" column="1" message="MaxLineLength"/>
+      <Issue line="72" column="1" message="MaxLineLength"/>
+    </File>
+    <File name="modules/scheduler/src/test/kotlin/com/hebe/scheduler/maintenance/StuckJobDetectorTest.kt">
+      <Issue line="83" column="2" message="NewLineAtEndOfFile"/>
+      <Issue line="73" column="1" message="MaxLineLength"/>
+    </File>
+    <File name="modules/scheduler/src/test/kotlin/com/hebe/scheduler/maintenance/SummariserTest.kt">
+      <Issue line="81" column="3" message="NewLineAtEndOfFile"/>
+      <Issue line="14" column="1" message="MaxLineLength"/>
+      <Issue line="19" column="1" message="MaxLineLength"/>
+      <Issue line="31" column="1" message="MaxLineLength"/>
+      <Issue line="73" column="1" message="MaxLineLength"/>
+    </File>
+  </SmellsSchema>
+</detekt>

@@ -23,6 +23,10 @@ dependencies {
     implementation(project(":modules:tools:dispatch"))
     implementation(project(":modules:plugins"))
     implementation(project(":modules:mcp-server"))
+    implementation(project(":modules:core"))
+    implementation(project(":modules:memory"))
+    implementation(project(":modules:providers:openai-compat"))
+    implementation(project(":modules:tools:builtin"))
+    implementation(project(":modules:scheduler"))
     implementation(libs.ktor.server.core)
-    implementation(libs.kotlinx.coroutines.core)
 }
