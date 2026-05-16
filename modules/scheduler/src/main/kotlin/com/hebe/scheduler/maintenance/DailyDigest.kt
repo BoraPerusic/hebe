@@ -6,14 +6,12 @@ import com.hebe.api.LlmProvider
 import com.hebe.api.StreamEvent
 import com.hebe.config.HebeConfig
 import com.hebe.memory.db.Db
-import kotlinx.coroutines.flow.collect
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.sql.Timestamp
 import javax.sql.DataSource
+import kotlinx.coroutines.flow.collect
+import org.slf4j.LoggerFactory
 
 class DailyDigest(
     private val db: Db,
@@ -92,74 +90,89 @@ class DailyDigest(
         return end.toInstant(java.time.ZoneOffset.UTC).toEpochMilli()
     }
 
-    private fun dateFromTimestamp(ts: Long): String {
-        return java.time.Instant.ofEpochMilli(ts)
+    private fun dateFromTimestamp(ts: Long): String =
+        java.time.Instant
+            .ofEpochMilli(ts)
             .atZone(java.time.ZoneOffset.UTC)
             .toLocalDate()
             .toString()
-    }
 
-    private fun countMessagesInRange(start: Long, end: Long): Int {
+    private fun countMessagesInRange(
+        start: Long,
+        end: Long,
+    ): Int {
         ds.connection.use { conn ->
-            conn.prepareStatement(
-                "SELECT COUNT(*) FROM messages WHERE ts >= ? AND ts < ?",
-            ).use { ps ->
-                ps.setTimestamp(1, Timestamp(start))
-                ps.setTimestamp(2, Timestamp(end))
-                val rs = ps.executeQuery()
-                rs.next()
-                return rs.getInt(1)
-            }
-        }
-    }
-
-    private fun countNonHeartbeatJobsInRange(start: Long, end: Long): Int {
-        ds.connection.use { conn ->
-            conn.prepareStatement(
-                "SELECT COUNT(*) FROM jobs WHERE started_at >= ? AND started_at < ? AND kind != 'heartbeat'",
-            ).use { ps ->
-                ps.setTimestamp(1, Timestamp(start))
-                ps.setTimestamp(2, Timestamp(end))
-                val rs = ps.executeQuery()
-                rs.next()
-                return rs.getInt(1)
-            }
-        }
-    }
-
-    private fun loadMessagesInRange(start: Long, end: Long): List<MessageRow> {
-        ds.connection.use { conn ->
-            conn.prepareStatement(
-                """
-                SELECT m.id, m.conversation_id, m.role, m.content, m.ts
-                FROM messages m
-                WHERE m.ts >= ? AND m.ts < ?
-                ORDER BY m.ts ASC
-                LIMIT 500
-                """.trimIndent(),
-            ).use { ps ->
-                ps.setTimestamp(1, Timestamp(start))
-                ps.setTimestamp(2, Timestamp(end))
-                val rs = ps.executeQuery()
-                val rows = mutableListOf<MessageRow>()
-                while (rs.next()) {
-                    rows.add(
-                        MessageRow(
-                            id = rs.getString(1),
-                            convId = rs.getString(2),
-                            role = rs.getString(3),
-                            content = rs.getString(4),
-                            ts = rs.getTimestamp(5).time,
-                        ),
-                    )
+            conn
+                .prepareStatement(
+                    "SELECT COUNT(*) FROM messages WHERE ts >= ? AND ts < ?",
+                ).use { ps ->
+                    ps.setTimestamp(1, Timestamp(start))
+                    ps.setTimestamp(2, Timestamp(end))
+                    val rs = ps.executeQuery()
+                    rs.next()
+                    return rs.getInt(1)
                 }
-                return rows
-            }
+        }
+    }
+
+    private fun countNonHeartbeatJobsInRange(
+        start: Long,
+        end: Long,
+    ): Int {
+        ds.connection.use { conn ->
+            conn
+                .prepareStatement(
+                    "SELECT COUNT(*) FROM jobs WHERE started_at >= ? AND started_at < ? AND kind != 'heartbeat'",
+                ).use { ps ->
+                    ps.setTimestamp(1, Timestamp(start))
+                    ps.setTimestamp(2, Timestamp(end))
+                    val rs = ps.executeQuery()
+                    rs.next()
+                    return rs.getInt(1)
+                }
+        }
+    }
+
+    private fun loadMessagesInRange(
+        start: Long,
+        end: Long,
+    ): List<MessageRow> {
+        ds.connection.use { conn ->
+            conn
+                .prepareStatement(
+                    """
+                    SELECT m.id, m.conversation_id, m.role, m.content, m.ts
+                    FROM messages m
+                    WHERE m.ts >= ? AND m.ts < ?
+                    ORDER BY m.ts ASC
+                    LIMIT 500
+                    """.trimIndent(),
+                ).use { ps ->
+                    ps.setTimestamp(1, Timestamp(start))
+                    ps.setTimestamp(2, Timestamp(end))
+                    val rs = ps.executeQuery()
+                    val rows = mutableListOf<MessageRow>()
+                    while (rs.next()) {
+                        rows.add(
+                            MessageRow(
+                                id = rs.getString(1),
+                                convId = rs.getString(2),
+                                role = rs.getString(3),
+                                content = rs.getString(4),
+                                ts = rs.getTimestamp(5).time,
+                            ),
+                        )
+                    }
+                    return rows
+                }
         }
     }
 
     @Suppress("NestedBlockDepth")
-    private fun loadReceiptsInRange(start: Long, end: Long): List<String> {
+    private fun loadReceiptsInRange(
+        start: Long,
+        end: Long,
+    ): List<String> {
         val receiptsPath = Path.of(receiptsDir)
         if (!Files.exists(receiptsPath)) return emptyList()
         return try {
@@ -174,7 +187,8 @@ class DailyDigest(
                                 result.add(line)
                             }
                         }
-                    } catch (_: Exception) { }
+                    } catch (_: Exception) {
+                    }
                 }
             }
             result.take(200)
@@ -183,32 +197,36 @@ class DailyDigest(
         }
     }
 
-    private fun loadJobsInRange(start: Long, end: Long): List<JobRow> {
+    private fun loadJobsInRange(
+        start: Long,
+        end: Long,
+    ): List<JobRow> {
         ds.connection.use { conn ->
-            conn.prepareStatement(
-                """
-                SELECT id, kind, status, result_json FROM jobs
-                WHERE started_at >= ? AND started_at < ?
-                ORDER BY started_at ASC
-                LIMIT 100
-                """.trimIndent(),
-            ).use { ps ->
-                ps.setTimestamp(1, Timestamp(start))
-                ps.setTimestamp(2, Timestamp(end))
-                val rs = ps.executeQuery()
-                val rows = mutableListOf<JobRow>()
-                while (rs.next()) {
-                    rows.add(
-                        JobRow(
-                            id = rs.getString(1),
-                            kind = rs.getString(2),
-                            status = rs.getString(3),
-                            resultJson = rs.getString(4),
-                        ),
-                    )
+            conn
+                .prepareStatement(
+                    """
+                    SELECT id, kind, status, result_json FROM jobs
+                    WHERE started_at >= ? AND started_at < ?
+                    ORDER BY started_at ASC
+                    LIMIT 100
+                    """.trimIndent(),
+                ).use { ps ->
+                    ps.setTimestamp(1, Timestamp(start))
+                    ps.setTimestamp(2, Timestamp(end))
+                    val rs = ps.executeQuery()
+                    val rows = mutableListOf<JobRow>()
+                    while (rs.next()) {
+                        rows.add(
+                            JobRow(
+                                id = rs.getString(1),
+                                kind = rs.getString(2),
+                                status = rs.getString(3),
+                                resultJson = rs.getString(4),
+                            ),
+                        )
+                    }
+                    return rows
                 }
-                return rows
-            }
         }
     }
 
@@ -224,7 +242,11 @@ class DailyDigest(
             com.hebe.api.ChatRequest(
                 model = model,
                 systemPrompt = "You are a daily digest generator. Output ONLY the markdown document with sections: Conversations, Tools called, Facts learned, Issues encountered.",
-                messages = listOf(com.hebe.api.ChatMessage.User(prompt)),
+                messages =
+                    listOf(
+                        com.hebe.api.ChatMessage
+                            .User(prompt),
+                    ),
                 tools = emptyList(),
                 temperature = 0.3,
                 stream = false,

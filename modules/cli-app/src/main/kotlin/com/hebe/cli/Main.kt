@@ -15,16 +15,31 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import com.hebe.cli.daemon.PidFile
+import com.hebe.cli.daemon.Shutdown
+import com.hebe.config.ConfigLoader
+import com.hebe.config.ConfigResult
+import com.hebe.config.HebeConfig
+import com.hebe.config.OsKeychainSecretStore
+import com.hebe.gateway.Gateway
+import com.hebe.observability.LogbackObserver
+import com.hebe.observability.OtelBootstrap
 import com.hebe.security.estop.EstopIpc
 import com.hebe.security.receipts.ReceiptVerifier
 import com.hebe.security.receipts.VerifyResult
 import java.net.HttpURLConnection
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.Base64
 import kotlin.io.path.exists
 import kotlin.io.path.readText
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
+import org.slf4j.LoggerFactory
 
 fun main(args: Array<String>) {
     HebeCLI().main(args)
@@ -60,8 +75,58 @@ class HebeCLI : CliktCommand(name = "hebe") {
 }
 
 class RunCommand : CliktCommand(name = "run") {
+    private val log = LoggerFactory.getLogger(RunCommand::class.java)
+
     override fun run() {
-        echo("Not yet implemented: hebe run")
+        val workspaceRoot = Path.of(System.getProperty("user.home"), ".hebe")
+        Files.createDirectories(workspaceRoot)
+
+        val configPath = workspaceRoot.resolve("config.toml")
+        val config =
+            if (Files.exists(configPath)) {
+                when (val r = ConfigLoader().load(configPath)) {
+                    is ConfigResult.Ok -> r.value
+                    is ConfigResult.Error -> {
+                        log.warn("Failed to load config, using defaults: {}", r.diagnostics)
+                        HebeConfig.default()
+                    }
+                }
+            } else {
+                HebeConfig.default()
+            }
+
+        val secretStore = OsKeychainSecretStore.create(workspaceRoot)
+        val logbackObserver = LogbackObserver()
+        val observer = OtelBootstrap.createObserver(logbackObserver)
+
+        log.info("building agent components")
+        val components = AgentFactory.build(config, secretStore, workspaceRoot, observer, log)
+
+        val channelWiring =
+            ChannelWiring(
+                webChannel = components.webChannel,
+                receiptsDir = workspaceRoot.resolve("receipts"),
+            )
+
+        val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+
+        runBlocking {
+            channelWiring.registerChannels(components.channelManager)
+        }
+        components.channelManager.start(scope)
+
+        val pidFile = PidFile.acquire(workspaceRoot.resolve("hebe.pid"))
+        Shutdown.installHook(pidFile) {
+            log.info("draining in-flight turns")
+            components.shutdown()
+        }
+
+        log.info("starting gateway on {}:{}", config.channels.web.bind, config.channels.web.port)
+        Gateway().start(
+            config = config.channels.web,
+            secretStore = secretStore,
+            mcpDeps = null,
+        ) { channelWiring.applyToGateway(this) }
     }
 }
 
@@ -463,56 +528,339 @@ class DoctorCommand : CliktCommand(name = "doctor") {
 }
 
 class ServiceInstallCommand : CliktCommand(name = "service install") {
+    private val jar by option("--jar", help = "Path to hebe.jar").default("")
+    private val java by option("--java", help = "Path to java binary").default(
+        ProcessHandle
+            .current()
+            .info()
+            .command()
+            .orElse("java"),
+    )
+
     override fun run() {
-        echo("Not yet implemented: hebe service install")
+        val dataDir = Path.of(System.getProperty("user.home"), ".hebe")
+        val svc =
+            com.hebe.cli.service
+                .platformService(dataDir)
+        val jarPath =
+            jar.ifEmpty {
+                val devJar = Path.of(System.getProperty("user.dir"), "modules", "cli-app", "build", "libs", "hebe.jar")
+                if (Files.exists(devJar)) {
+                    devJar.toString()
+                } else {
+                    echo("Error: --jar not specified and hebe.jar not found at $devJar")
+                    return
+                }
+            }
+        val result = svc.install(jarPath, java)
+        if (result.isSuccess) {
+            echo("Service installed. Run `hebe service start` to start it.")
+            echo("Note (Linux): run `loginctl enable-linger \$USER` to survive logouts.")
+        } else {
+            echo("Error: ${result.exceptionOrNull()?.message}")
+        }
     }
 }
 
 class ServiceStartCommand : CliktCommand(name = "service start") {
     override fun run() {
-        echo("Not yet implemented: hebe service start")
+        val dataDir = Path.of(System.getProperty("user.home"), ".hebe")
+        val result =
+            com.hebe.cli.service
+                .platformService(dataDir)
+                .start()
+        if (result.isSuccess) echo("Service started.") else echo("Error: ${result.exceptionOrNull()?.message}")
     }
 }
 
 class ServiceStopCommand : CliktCommand(name = "service stop") {
     override fun run() {
-        echo("Not yet implemented: hebe service stop")
+        val dataDir = Path.of(System.getProperty("user.home"), ".hebe")
+        val result =
+            com.hebe.cli.service
+                .platformService(dataDir)
+                .stop()
+        if (result.isSuccess) echo("Service stopped.") else echo("Error: ${result.exceptionOrNull()?.message}")
     }
 }
 
 class ServiceUninstallCommand : CliktCommand(name = "service uninstall") {
     override fun run() {
-        echo("Not yet implemented: hebe service uninstall")
+        val dataDir = Path.of(System.getProperty("user.home"), ".hebe")
+        val result =
+            com.hebe.cli.service
+                .platformService(dataDir)
+                .uninstall()
+        if (result.isSuccess) echo("Service uninstalled.") else echo("Error: ${result.exceptionOrNull()?.message}")
     }
 }
 
 class StatusCommand : CliktCommand(name = "status") {
+    private val url by option("--url", help = "Gateway base URL").default("http://127.0.0.1:8765")
+    private val password by option("--password", help = "Admin password (plaintext)")
+    private val recent by option("--recent", help = "Show last 20 receipts").flag()
+    private val watch by option("--watch", help = "Refresh every 2s").flag()
+
     override fun run() {
-        echo("Not yet implemented: hebe status")
+        if (watch) {
+            while (true) {
+                print("[2J[H")
+                printStatus()
+                Thread.sleep(2_000)
+            }
+        } else {
+            printStatus()
+            if (recent) printReceipts()
+        }
+    }
+
+    private fun printStatus() {
+        try {
+            val conn = URI("$url/api/status").toURL().openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 3_000
+            conn.readTimeout = 5_000
+            if (password != null) {
+                val token = Base64.getEncoder().encodeToString("admin:$password".toByteArray())
+                conn.setRequestProperty("Authorization", "Basic $token")
+            }
+            conn.connect()
+            if (conn.responseCode == 200) {
+                echo(conn.inputStream.bufferedReader().readText())
+            } else {
+                echo("HTTP ${conn.responseCode}")
+            }
+            conn.disconnect()
+        } catch (e: Exception) {
+            echo("Cannot reach gateway at $url: ${e.message}")
+        }
+    }
+
+    private fun printReceipts() {
+        try {
+            val conn = URI("$url/api/receipts?limit=20").toURL().openConnection() as java.net.HttpURLConnection
+            conn.requestMethod = "GET"
+            conn.connectTimeout = 3_000
+            conn.readTimeout = 5_000
+            if (password != null) {
+                val token = Base64.getEncoder().encodeToString("admin:$password".toByteArray())
+                conn.setRequestProperty("Authorization", "Basic $token")
+            }
+            conn.connect()
+            if (conn.responseCode == 200) {
+                echo("\n--- Recent receipts ---")
+                echo(conn.inputStream.bufferedReader().readText())
+            }
+            conn.disconnect()
+        } catch (_: Exception) {
+        }
     }
 }
 
 class CompletionBashCommand : CliktCommand(name = "completion bash") {
     override fun run() {
-        echo("Not yet implemented: hebe completion bash")
+        echo(buildCompletionScript("bash"))
     }
 }
 
 class CompletionZshCommand : CliktCommand(name = "completion zsh") {
     override fun run() {
-        echo("Not yet implemented: hebe completion zsh")
+        echo(buildCompletionScript("zsh"))
     }
 }
 
 class CompletionFishCommand : CliktCommand(name = "completion fish") {
     override fun run() {
-        echo("Not yet implemented: hebe completion fish")
+        echo(buildCompletionScript("fish"))
+    }
+}
+
+private fun ask(
+    label: String,
+    default: String = "",
+): String {
+    val hint = if (default.isNotEmpty()) " [$default]" else ""
+    print("$label$hint: ")
+    System.out.flush()
+    val line = readLine()?.trim() ?: ""
+    return line.ifEmpty { default }
+}
+
+private fun askSecret(label: String): String {
+    val console = System.console()
+    return if (console != null) {
+        String(console.readPassword("$label: ") ?: charArrayOf())
+    } else {
+        print("$label: ")
+        System.out.flush()
+        readLine()?.trim() ?: ""
+    }
+}
+
+private val SUBCOMMANDS =
+    listOf(
+        "run",
+        "mcp serve",
+        "plugin install",
+        "plugin list",
+        "plugin remove",
+        "doctor",
+        "service install",
+        "service start",
+        "service stop",
+        "service uninstall",
+        "status",
+        "completion bash",
+        "completion zsh",
+        "completion fish",
+        "onboard",
+        "estop",
+        "memory show",
+    )
+
+private fun buildCompletionScript(shell: String): String {
+    val dollar = "$"
+    val subcmds = SUBCOMMANDS.joinToString(" ")
+    return when (shell) {
+        "bash" ->
+            """
+            _hebe_completions() {
+                local cur="$dollar{COMP_WORDS[${dollar}COMP_CWORD]}"
+                local subcommands="$subcmds"
+                COMPREPLY=( ${'$'}(compgen -W "${dollar}subcommands" -- "${dollar}cur") )
+            }
+            complete -F _hebe_completions hebe
+            """.trimIndent()
+        "zsh" ->
+            """
+            #compdef hebe
+            _hebe() {
+                local subcmds=(${SUBCOMMANDS.joinToString(" ") { "\"$it\"" }})
+                _describe 'command' subcmds
+            }
+            _hebe
+            """.trimIndent()
+        "fish" -> SUBCOMMANDS.joinToString("\n") { "complete -c hebe -f -a '$it'" }
+        else -> ""
     }
 }
 
 class OnboardCommand : CliktCommand(name = "onboard") {
+    private val force by option("--force", help = "Re-run even if already configured").flag()
+
+    @Suppress("LongMethod", "ComplexMethod")
     override fun run() {
-        echo("Not yet implemented: hebe onboard")
+        val dataDir = Path.of(System.getProperty("user.home"), ".hebe")
+        Files.createDirectories(dataDir)
+        val configPath = dataDir.resolve("config.toml")
+        val bootstrapPath = dataDir.resolve("BOOTSTRAP.md")
+
+        if (!force &&
+            com.hebe.cli.onboard
+                .isAlreadyOnboarded(configPath, bootstrapPath)
+        ) {
+            echo("Already onboarded. Use --force to reconfigure.")
+            return
+        }
+
+        echo("=== Hebe Onboarding Wizard ===")
+        echo("")
+
+        // Step 1: LLM endpoint
+        var llmBaseUrl: String
+        var apiKey: String
+        while (true) {
+            llmBaseUrl = ask("LLM base URL", "https://api.openai.com/v1")
+            apiKey = askSecret("API key")
+            echo("Validating LLM endpoint...")
+            if (com.hebe.cli.onboard
+                    .validateLlmEndpoint(llmBaseUrl, apiKey)
+            ) {
+                echo("OK")
+                break
+            }
+            echo("Warning: endpoint did not respond with 200. Continue anyway? [y/N]")
+            if (readLine()?.trim()?.lowercase() != "y") continue
+            break
+        }
+
+        // Step 2: Default model
+        val defaultModel = ask("Default model", "gpt-4o-mini")
+
+        // Step 3: Admin password
+        val adminPassword = askSecret("Web admin password")
+        val confirmPassword = askSecret("Confirm admin password")
+        if (adminPassword != confirmPassword) {
+            echo("Passwords do not match. Aborting.")
+            return
+        }
+
+        // Step 4: Telegram (optional)
+        echo("Enable Telegram channel? [y/N]")
+        val enableTelegram = readLine()?.trim()?.lowercase() == "y"
+        var botToken = ""
+        var operatorId = 0L
+        if (enableTelegram) {
+            while (true) {
+                botToken = askSecret("Telegram bot token")
+                echo("Validating bot token...")
+                if (com.hebe.cli.onboard
+                        .validateTelegramToken(botToken)
+                ) {
+                    echo("OK")
+                    break
+                }
+                echo("Invalid token. Retry? [y/N]")
+                if (readLine()?.trim()?.lowercase() != "y") break
+            }
+            operatorId = ask("Your Telegram user ID (numeric)", "0").trim().toLongOrNull() ?: 0L
+        }
+
+        val answers =
+            com.hebe.cli.onboard.OnboardAnswers(
+                llmBaseUrl = llmBaseUrl,
+                apiKey = apiKey,
+                defaultModel = defaultModel,
+                adminPassword = adminPassword,
+                telegramEnabled = enableTelegram && botToken.isNotEmpty(),
+                telegramBotToken = botToken,
+                operatorTelegramId = operatorId,
+            )
+
+        // Step 5: Write config
+        echo("Writing config.toml...")
+        val toml =
+            com.hebe.cli.onboard
+                .generateConfigToml(answers, dataDir)
+        Files.writeString(configPath, toml)
+
+        // Step 6: Persist secrets
+        echo("Storing secrets...")
+        val secretStore = OsKeychainSecretStore.create(dataDir)
+        runBlocking {
+            secretStore.set("llm.api_key", apiKey.toByteArray())
+            secretStore.set("web.password", adminPassword.toByteArray())
+            if (enableTelegram && botToken.isNotEmpty()) {
+                secretStore.set("telegram.bot_token", botToken.toByteArray())
+            }
+        }
+
+        // Step 7: Seed workspace + signing key
+        echo("Seeding workspace...")
+        val workspaceFs =
+            com.hebe.memory.workspace
+                .WorkspaceFs(dataDir)
+        com.hebe.memory.workspace.WorkspaceSeeder
+            .seedIfMissing(workspaceFs, dataDir)
+        runBlocking {
+            com.hebe.security.receipts.SigningKey
+                .bootstrap(secretStore)
+        }
+
+        // Step 8: Finalise
+        Files.deleteIfExists(bootstrapPath)
+        echo("")
+        echo("All set! Run `hebe doctor` to verify, then `hebe run` to start.")
     }
 }
 

@@ -2,12 +2,11 @@ package com.hebe.scheduler
 
 import com.hebe.api.ApprovalGate
 import com.hebe.api.Channel
-import com.hebe.api.ChatMessage
 import com.hebe.api.ChatRole
 import com.hebe.api.ConversationMessage
+import com.hebe.api.LlmProvider
 import com.hebe.api.LoopConfig
 import com.hebe.api.LoopOutcome
-import com.hebe.api.LlmProvider
 import com.hebe.api.MemoryStore
 import com.hebe.api.Observer
 import com.hebe.api.Reasoning
@@ -19,14 +18,12 @@ import com.hebe.core.compaction.PreemptivePruner
 import com.hebe.core.cost.CostGuard
 import com.hebe.core.delegate.JobDelegate
 import com.hebe.tools.dispatch.ToolDispatcher
+import java.util.UUID
+import kotlin.time.Clock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
-import java.util.UUID
-import kotlin.time.Clock
 
 @Suppress("LongParameterList", "EmptyFunctionBlock", "TooGenericExceptionCaught")
 class JobRunner(
@@ -44,8 +41,8 @@ class JobRunner(
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    suspend fun run(job: Job): Boolean {
-        return try {
+    suspend fun run(job: Job): Boolean =
+        try {
             when (job.kind) {
                 "routine" -> runRoutine(job)
                 "adhoc" -> runAdhoc(job)
@@ -59,31 +56,34 @@ class JobRunner(
             logger.error("job={} run failed: {}", job.id, e.message, e)
             false
         }
-    }
 
     private suspend fun runMaintenance(job: Job): Boolean {
-        val taskName = job.payload()["task"] ?: run {
-            logger.warn("job={} maintenance missing task", job.id)
-            return false
-        }
-        val handler = maintenanceHandlers[taskName] ?: run {
-            logger.warn("job={} maintenance unknown task={}", job.id, taskName)
-            return false
-        }
+        val taskName =
+            job.payload()["task"] ?: run {
+                logger.warn("job={} maintenance missing task", job.id)
+                return false
+            }
+        val handler =
+            maintenanceHandlers[taskName] ?: run {
+                logger.warn("job={} maintenance unknown task={}", job.id, taskName)
+                return false
+            }
         return handler(job)
     }
 
     private suspend fun runRoutine(job: Job): Boolean {
         val payload = job.payload()
-        val routineId = payload["routine_id"] ?: run {
-            logger.warn("job={} routine missing routine_id", job.id)
-            return false
-        }
+        val routineId =
+            payload["routine_id"] ?: run {
+                logger.warn("job={} routine missing routine_id", job.id)
+                return false
+            }
 
-        val routine = repo.loadRoutine(routineId) ?: run {
-            logger.warn("job={} routine {} not found", job.id, routineId)
-            return false
-        }
+        val routine =
+            repo.loadRoutine(routineId) ?: run {
+                logger.warn("job={} routine {} not found", job.id, routineId)
+                return false
+            }
 
         logger.info("job={} running routine {} ({})", job.id, routineId, routine.name)
 
@@ -93,16 +93,20 @@ class JobRunner(
 
     private suspend fun runAdhoc(job: Job): Boolean {
         val payload = job.payload()
-        val prompt = payload["prompt"] ?: run {
-            logger.warn("job={} adhoc missing prompt", job.id)
-            return false
-        }
+        val prompt =
+            payload["prompt"] ?: run {
+                logger.warn("job={} adhoc missing prompt", job.id)
+                return false
+            }
 
         logger.info("job={} running adhoc", job.id)
         return runTurn(job.id, prompt)
     }
 
-    private suspend fun runTurn(jobId: String, prompt: String): Boolean {
+    private suspend fun runTurn(
+        jobId: String,
+        prompt: String,
+    ): Boolean {
         val delegate =
             JobDelegate(
                 jobId = jobId,
@@ -148,10 +152,17 @@ class JobRunner(
             override val requestor: Channel =
                 object : Channel {
                     override val name: String = "scheduler"
+
                     override suspend fun start(scope: CoroutineScope): Flow<com.hebe.api.IncomingMessage> = flow { }
+
                     @Suppress("EmptyFunctionBlock")
-                    override suspend fun reply(ctx: com.hebe.api.ReplyContext, msg: com.hebe.api.OutboundMessage) {}
+                    override suspend fun reply(
+                        ctx: com.hebe.api.ReplyContext,
+                        msg: com.hebe.api.OutboundMessage,
+                    ) {}
+
                     override suspend fun healthCheck(): com.hebe.api.ChannelHealth = com.hebe.api.ChannelHealth.Up
+
                     @Suppress("EmptyFunctionBlock")
                     override suspend fun shutdown() {}
                 }
@@ -164,11 +175,14 @@ class JobRunner(
                 }
         }
 
-    private fun buildBodyPrompt(bodyKind: String, bodyRef: String, bodyJson: String?): String {
-        return when (bodyKind) {
+    private fun buildBodyPrompt(
+        bodyKind: String,
+        bodyRef: String,
+        bodyJson: String?,
+    ): String =
+        when (bodyKind) {
             "tool" -> "Run tool: $bodyRef with args: ${bodyJson ?: "{}"}"
             "skill" -> "Run skill: $bodyRef with params: ${bodyJson ?: "{}"}"
             else -> bodyRef
         }
-    }
 }

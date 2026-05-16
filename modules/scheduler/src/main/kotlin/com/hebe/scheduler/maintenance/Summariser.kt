@@ -2,21 +2,13 @@
 
 package com.hebe.scheduler.maintenance
 
-import com.hebe.api.ConversationMessage
 import com.hebe.api.LlmProvider
 import com.hebe.config.HebeConfig
 import com.hebe.memory.db.Db
-import com.hebe.scheduler.cron.CronParser
-import com.hebe.scheduler.cron.nextFire
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.datetime.TimeZone
-import kotlinx.serialization.json.buildJsonArray
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import org.slf4j.LoggerFactory
 import java.sql.Timestamp
 import javax.sql.DataSource
+import kotlinx.datetime.TimeZone
+import org.slf4j.LoggerFactory
 
 class Summariser(
     private val db: Db,
@@ -49,8 +41,8 @@ class Summariser(
     }
 
     @Suppress("NestedBlockDepth")
-    suspend fun run(nowMs: Long = System.currentTimeMillis()): Result<Int> {
-        return try {
+    suspend fun run(nowMs: Long = System.currentTimeMillis()): Result<Int> =
+        try {
             val conversations = loadActiveConversations(nowMs)
             var summarised = 0
             for (conv in conversations) {
@@ -66,33 +58,36 @@ class Summariser(
             logger.error("summariser run failed: {}", e.message, e)
             Result.failure(e)
         }
-    }
 
     private fun loadActiveConversations(nowMs: Long): List<ConversationRow> {
         val sinceMs = nowMs - LOOKBACK_HOURS * 3600 * 1000L
         ds.connection.use { conn ->
-            conn.prepareStatement(
-                """
-                SELECT c.id, COUNT(m.id) as msg_count
-                FROM conversations c
-                JOIN messages m ON m.conversation_id = c.id
-                WHERE m.ts > ?
-                GROUP BY c.id
-                HAVING msg_count >= 3
-                """.trimIndent(),
-            ).use { ps ->
-                ps.setTimestamp(1, Timestamp(sinceMs))
-                val rs = ps.executeQuery()
-                val rows = mutableListOf<ConversationRow>()
-                while (rs.next()) {
-                    rows.add(ConversationRow(rs.getString(1), rs.getInt(2)))
+            conn
+                .prepareStatement(
+                    """
+                    SELECT c.id, COUNT(m.id) as msg_count
+                    FROM conversations c
+                    JOIN messages m ON m.conversation_id = c.id
+                    WHERE m.ts > ?
+                    GROUP BY c.id
+                    HAVING msg_count >= 3
+                    """.trimIndent(),
+                ).use { ps ->
+                    ps.setTimestamp(1, Timestamp(sinceMs))
+                    val rs = ps.executeQuery()
+                    val rows = mutableListOf<ConversationRow>()
+                    while (rs.next()) {
+                        rows.add(ConversationRow(rs.getString(1), rs.getInt(2)))
+                    }
+                    return rows
                 }
-                return rows
-            }
         }
     }
 
-    private suspend fun summariseConversation(conv: ConversationRow, nowMs: Long): Int {
+    private suspend fun summariseConversation(
+        conv: ConversationRow,
+        nowMs: Long,
+    ): Int {
         val messages = loadMessagesForSummarisation(conv.id)
         if (messages.isEmpty()) return 0
 
@@ -105,7 +100,10 @@ class Summariser(
         val summary = generateSummary(unsummarised)
         if (summary.isBlank()) return 0
 
-        val summaryId = java.util.UUID.randomUUID().toString()
+        val summaryId =
+            java.util.UUID
+                .randomUUID()
+                .toString()
         val summarySection = buildSummarySection(summary, nowMs)
 
         appendToMemoryMd(conv.id, summarySection)
@@ -118,30 +116,31 @@ class Summariser(
     private fun loadMessagesForSummarisation(convId: String): List<MessageRow> {
         val sinceMs = System.currentTimeMillis() - LOOKBACK_HOURS * 3600 * 1000L
         ds.connection.use { conn ->
-            conn.prepareStatement(
-                """
-                SELECT id, role, content, ts FROM messages
-                WHERE conversation_id = ? AND ts > ? AND summary_id IS NULL
-                ORDER BY ts ASC
-                LIMIT 200
-                """.trimIndent(),
-            ).use { ps ->
-                ps.setString(1, convId)
-                ps.setTimestamp(2, Timestamp(sinceMs))
-                val rs = ps.executeQuery()
-                val messages = mutableListOf<MessageRow>()
-                while (rs.next()) {
-                    messages.add(
-                        MessageRow(
-                            id = rs.getString(1),
-                            role = rs.getString(2),
-                            content = rs.getString(3),
-                            ts = rs.getTimestamp(4).time,
-                        ),
-                    )
+            conn
+                .prepareStatement(
+                    """
+                    SELECT id, role, content, ts FROM messages
+                    WHERE conversation_id = ? AND ts > ? AND summary_id IS NULL
+                    ORDER BY ts ASC
+                    LIMIT 200
+                    """.trimIndent(),
+                ).use { ps ->
+                    ps.setString(1, convId)
+                    ps.setTimestamp(2, Timestamp(sinceMs))
+                    val rs = ps.executeQuery()
+                    val messages = mutableListOf<MessageRow>()
+                    while (rs.next()) {
+                        messages.add(
+                            MessageRow(
+                                id = rs.getString(1),
+                                role = rs.getString(2),
+                                content = rs.getString(3),
+                                ts = rs.getTimestamp(4).time,
+                            ),
+                        )
+                    }
+                    return messages
                 }
-                return messages
-            }
         }
     }
 
@@ -152,7 +151,11 @@ class Summariser(
             com.hebe.api.ChatRequest(
                 model = model,
                 systemPrompt = "You are a precise summariser. Summarise the conversation concisely, capturing key facts, decisions, and context. Output only the summary text.",
-                messages = listOf(com.hebe.api.ChatMessage.User(prompt)),
+                messages =
+                    listOf(
+                        com.hebe.api.ChatMessage
+                            .User(prompt),
+                    ),
                 tools = emptyList(),
                 temperature = 0.3,
                 stream = false,
@@ -176,33 +179,52 @@ class Summariser(
         return sb.toString()
     }
 
-    private fun buildSummarySection(summary: String, nowMs: Long): String {
+    private fun buildSummarySection(
+        summary: String,
+        nowMs: Long,
+    ): String {
         val ts = java.time.Instant.ofEpochMilli(nowMs)
         val dateStr = ts.toString().substringBefore("T")
         val timeStr = ts.toString().substringAfter("T").substringBefore(".")
         return "\n## Summary $dateStr $timeStr\n\n$summary\n"
     }
 
-    private fun appendToMemoryMd(convId: String, section: String) {
-        val path = java.nio.file.Path.of(workspaceRoot, convId, MEMORY_MD)
-        val existing = if (java.nio.file.Files.exists(path)) {
-            java.nio.file.Files.readString(path)
-        } else ""
+    private fun appendToMemoryMd(
+        convId: String,
+        section: String,
+    ) {
+        val path =
+            java.nio.file.Path
+                .of(workspaceRoot, convId, MEMORY_MD)
+        val existing =
+            if (java.nio.file.Files
+                    .exists(path)
+            ) {
+                java.nio.file.Files
+                    .readString(path)
+            } else {
+                ""
+            }
         val updated = existing + section
-        java.nio.file.Files.writeString(path, updated)
+        java.nio.file.Files
+            .writeString(path, updated)
     }
 
-    private fun markMessagesSummarised(messageIds: List<String>, summaryId: String) {
+    private fun markMessagesSummarised(
+        messageIds: List<String>,
+        summaryId: String,
+    ) {
         if (messageIds.isEmpty()) return
         ds.connection.use { conn ->
             val placeholders = messageIds.indices.joinToString(",") { "?" }
-            conn.prepareStatement(
-                "UPDATE messages SET summary_id = ? WHERE id IN ($placeholders)",
-            ).use { ps ->
-                ps.setString(1, summaryId)
-                messageIds.forEachIndexed { idx, id -> ps.setString(idx + 2, id) }
-                ps.executeUpdate()
-            }
+            conn
+                .prepareStatement(
+                    "UPDATE messages SET summary_id = ? WHERE id IN ($placeholders)",
+                ).use { ps ->
+                    ps.setString(1, summaryId)
+                    messageIds.forEachIndexed { idx, id -> ps.setString(idx + 2, id) }
+                    ps.executeUpdate()
+                }
         }
     }
 
@@ -211,7 +233,11 @@ class Summariser(
         return totalChars / 4
     }
 
-    data class ConversationRow(val id: String, val msgCount: Int)
+    data class ConversationRow(
+        val id: String,
+        val msgCount: Int,
+    )
+
     data class MessageRow(
         val id: String,
         val role: String,

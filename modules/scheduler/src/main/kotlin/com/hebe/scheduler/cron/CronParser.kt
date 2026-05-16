@@ -2,17 +2,17 @@
 
 package com.hebe.scheduler.cron
 
-import kotlinx.datetime.LocalDateTime
-import kotlinx.datetime.TimeZone
-import kotlinx.datetime.toLocalDateTime
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone
 import kotlinx.datetime.number
 import kotlinx.datetime.toInstant
+import kotlinx.datetime.toLocalDateTime
 
 object CronParser {
     fun parse(expr: String): Cron {
@@ -60,7 +60,12 @@ object CronParser {
         return Cron.Standard(minute, hour, dom, month, dow)
     }
 
-    private fun parseField(value: String, min: Int, max: Int, name: String): Int {
+    private fun parseField(
+        value: String,
+        min: Int,
+        max: Int,
+        name: String,
+    ): Int {
         if (value == "*") return -1
         if (value.contains("/")) return parseStep(value, min, max, name)
         if (value.contains(",")) return parseList(value)
@@ -68,7 +73,12 @@ object CronParser {
         return parseSingle(value, min, max, name)
     }
 
-    private fun parseStep(value: String, min: Int, max: Int, name: String): Int {
+    private fun parseStep(
+        value: String,
+        min: Int,
+        max: Int,
+        name: String,
+    ): Int {
         val parts = value.split("/")
         require(parts.size == 2) { "Invalid step: '$value'" }
         val step = parts[1].toIntOrNull() ?: throw IllegalArgumentException("Invalid step value: '${parts[1]}'")
@@ -76,11 +86,14 @@ object CronParser {
         return if (parts[0] == "*") -1 else parseSingle(parts[0], min, max, name)
     }
 
-    private fun parseList(value: String): Int {
-        throw IllegalArgumentException("Comma lists not supported in v1: '$value'")
-    }
+    private fun parseList(value: String): Int = throw IllegalArgumentException("Comma lists not supported in v1: '$value'")
 
-    private fun parseRange(value: String, min: Int, max: Int, name: String): Int {
+    private fun parseRange(
+        value: String,
+        min: Int,
+        max: Int,
+        name: String,
+    ): Int {
         val parts = value.split("-")
         require(parts.size == 2) { "Invalid range: '$value'" }
         val start = parts[0].toIntOrNull() ?: throw IllegalArgumentException("Invalid range start: '${parts[0]}'")
@@ -91,23 +104,33 @@ object CronParser {
         return start
     }
 
-    private fun parseSingle(value: String, min: Int, max: Int, name: String): Int {
+    private fun parseSingle(
+        value: String,
+        min: Int,
+        max: Int,
+        name: String,
+    ): Int {
         val int = value.toIntOrNull() ?: throw IllegalArgumentException("Invalid $name value: '$value'")
         require(int in min..max) { "$name out of range: $int (min=$min, max=$max)" }
         return int
     }
 }
 
-fun Cron.nextFire(now: Instant, tz: TimeZone): Instant {
-    return when (this) {
+fun Cron.nextFire(
+    now: Instant,
+    tz: TimeZone,
+): Instant =
+    when (this) {
         is Cron.Hourly -> this.nextFireHourly(now, tz)
         is Cron.Daily -> this.nextFireDaily(now, tz)
         is Cron.Every -> this.nextFireEvery(now)
         is Cron.Standard -> this.nextFireStandard(now, tz)
     }
-}
 
-private fun Cron.Hourly.nextFireHourly(now: Instant, tz: TimeZone): Instant {
+private fun Cron.Hourly.nextFireHourly(
+    now: Instant,
+    tz: TimeZone,
+): Instant {
     val local = now.toLocalDateTime(tz)
     val nextHour = if (local.hour < 23) local.hour + 1 else 0
     val dayOffset = if (local.hour == 23) 1.days else 0.days
@@ -115,10 +138,14 @@ private fun Cron.Hourly.nextFireHourly(now: Instant, tz: TimeZone): Instant {
         .toInstant(tz) + dayOffset
 }
 
-private fun Cron.nextFireDaily(now: Instant, tz: TimeZone): Instant {
+private fun Cron.nextFireDaily(
+    now: Instant,
+    tz: TimeZone,
+): Instant {
     val local = now.toLocalDateTime(tz)
-    val today = LocalDateTime(local.year, local.month.number, local.day, 0, 0, 0)
-        .toInstant(tz)
+    val today =
+        LocalDateTime(local.year, local.month.number, local.day, 0, 0, 0)
+            .toInstant(tz)
     return if (today > now) today else today + 1.days
 }
 
@@ -127,7 +154,10 @@ private fun Cron.Every.nextFireEvery(now: Instant): Instant {
     return now + interval
 }
 
-private fun Cron.Standard.nextFireStandard(now: Instant, tz: TimeZone): Instant {
+private fun Cron.Standard.nextFireStandard(
+    now: Instant,
+    tz: TimeZone,
+): Instant {
     var current = now + 1.minutes
     repeat(366 * 24 * 60) {
         val local = current.toLocalDateTime(tz)

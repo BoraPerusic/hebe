@@ -8,7 +8,9 @@ import kotlinx.serialization.json.put
 import org.slf4j.LoggerFactory
 
 @Suppress("TooGenericExceptionCaught")
-class RoutinesEngine(private val repo: JobRepo) {
+class RoutinesEngine(
+    private val repo: JobRepo,
+) {
     private val logger = LoggerFactory.getLogger(javaClass)
     private val utc = TimeZone.UTC
 
@@ -23,7 +25,10 @@ class RoutinesEngine(private val repo: JobRepo) {
         }
     }
 
-    private fun processRoutine(routine: RoutineRow, nowMs: Long) {
+    private fun processRoutine(
+        routine: RoutineRow,
+        nowMs: Long,
+    ) {
         val nextRun = routine.nextRunAt ?: (nowMs - 1)
         if (nextRun > nowMs) return
 
@@ -34,10 +39,11 @@ class RoutinesEngine(private val repo: JobRepo) {
 
         val isCatchup = routine.lastRunAt != null && isCatchupDue(routine, nowMs)
 
-        val payload = buildJsonObject {
-            put("routine_id", routine.id)
-            if (isCatchup) put("catchup", "true")
-        }
+        val payload =
+            buildJsonObject {
+                put("routine_id", routine.id)
+                if (isCatchup) put("catchup", "true")
+            }
 
         repo.insertPending("routine", nowMs, payload.toString())
 
@@ -46,7 +52,10 @@ class RoutinesEngine(private val repo: JobRepo) {
         logger.info("routine={} scheduled next_run_at={}", routine.id, nextRunAt)
     }
 
-    private fun isCatchupDue(routine: RoutineRow, nowMs: Long): Boolean {
+    private fun isCatchupDue(
+        routine: RoutineRow,
+        nowMs: Long,
+    ): Boolean {
         val lastRun = routine.lastRunAt ?: return false
         val cron = CronParser.parse(routine.cron)
         val lastInstant = kotlin.time.Instant.fromEpochMilliseconds(lastRun)

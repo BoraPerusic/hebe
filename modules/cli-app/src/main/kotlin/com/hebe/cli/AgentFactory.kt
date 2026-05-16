@@ -15,7 +15,6 @@ import com.hebe.api.Observer
 import com.hebe.api.OutboundMessage
 import com.hebe.api.ReplyContext
 import com.hebe.api.SecretLookup
-import com.hebe.api.ToolSpec
 import com.hebe.channels.ChannelManagerImpl
 import com.hebe.channels.telegram.TelegramChannel
 import com.hebe.channels.web.WebChannel
@@ -30,6 +29,10 @@ import com.hebe.memory.db.DbFactory
 import com.hebe.memory.workspace.WorkspaceFs
 import com.hebe.memory.workspace.WorkspaceSeeder
 import com.hebe.plugins.HebePluginManager
+import com.hebe.plugins.Lifecycle
+import com.hebe.plugins.PluginRegistrationStore
+import com.hebe.plugins.host.HostFactory
+import com.hebe.plugins.signature.SignatureVerifier
 import com.hebe.providers.openai.HttpClientFactory
 import com.hebe.providers.openai.OpenAiCompatProvider
 import com.hebe.security.approval.ApprovalGate
@@ -48,15 +51,15 @@ import com.hebe.tools.builtin.http.HttpTool
 import com.hebe.tools.builtin.shell.ShellTool
 import com.hebe.tools.dispatch.ToolDispatcher
 import com.hebe.tools.dispatch.ToolRegistry
+import java.nio.file.Path
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
+import org.pf4j.DefaultPluginManager
 import org.slf4j.Logger
-import java.nio.file.Path
 
 object AgentFactory {
-
     data class AgentComponents(
         val agent: HebeAgent,
         val dispatcher: ToolDispatcher,
@@ -119,7 +122,7 @@ object AgentFactory {
         // ── Tool stack ────────────────────────────────────────────────────
 
         val registry = ToolRegistry()
-        registerBuiltinTools(registry, workspaceRoot)
+        registerBuiltinTools(registry, workspaceFs)
 
         val validators = PolicyChain.standard(config, workspaceRoot)
 
@@ -154,7 +157,8 @@ object AgentFactory {
             if (config.channels.telegram.enabled) {
                 val botToken =
                     runBlocking {
-                        secretStore.get(config.channels.telegram.botTokenSecret)
+                        secretStore
+                            .get(config.channels.telegram.botTokenSecret)
                             ?.let { String(it, Charsets.UTF_8) }
                             ?: ""
                     }
@@ -178,15 +182,19 @@ object AgentFactory {
 
         val agent =
             HebeAgent(
-                sessionManager = com.hebe.core.agent.SessionManager(),
-                submissionParser = SubmissionParser(),
+                sessionManager =
+                    com.hebe.core.agent
+                        .SessionManager(),
+                submissionParser = SubmissionParser,
                 channel = dummyChannel,
                 memory = memoryStore,
                 dispatcher = dispatcher,
                 llmProvider = llmProvider,
                 costGuard = costGuard,
                 compactor = compactor,
-                hooks = com.hebe.core.hooks.HookRunner(),
+                hooks =
+                    com.hebe.core.hooks
+                        .HookRunner(),
                 observer = observer,
                 approvalGate = approvalGate,
                 secretLookup = secretLookup,
@@ -200,11 +208,49 @@ object AgentFactory {
 
         // ── Plugin loading ────────────────────────────────────────────────
 
-        val pluginManager = HebePluginManager(pluginsDir)
-        if (pluginManager.plugins.isNotEmpty()) {
-            pluginManager.loadPlugins()
-            pluginManager.startPlugins()
-        }
+        val pluginStore = PluginRegistrationStore()
+        val pluginRegistryWrapper =
+            object : Lifecycle.ToolRegistryWrapper {
+                override fun register(
+                    name: String,
+                    tool: com.hebe.api.Tool,
+                ) {
+                    registry.register(tool)
+                }
+
+                override fun unregister(name: String) {
+                    registry.unregister(name)
+                }
+            }
+        val hostFactory =
+            HostFactory(
+                secretResolver = { name -> runBlocking { secretStore.get(name)?.let { String(it, Charsets.UTF_8) } } },
+                observer = observer,
+                logger = log,
+            )
+        val signatureVerifier =
+            SignatureVerifier(
+                signatureMode = config.security.pluginSignatureMode,
+                trustedPublisherKeys = config.plugins.publisherKeys,
+                log = log,
+            )
+        // DefaultPluginManager() breaks the Lifecycle↔HebePluginManager circular dependency;
+        // its stopPlugin is only reached on plugin startup failures (error path, caught).
+        val pluginLifecycle =
+            Lifecycle(
+                pluginManager = DefaultPluginManager(),
+                pluginDir = pluginsDir,
+                toolRegistry = pluginRegistryWrapper,
+                hostFactory = hostFactory,
+                signatureVerifier = signatureVerifier,
+                observer = observer,
+                pluginStore = pluginStore,
+                secretResolver = { name -> runBlocking { secretStore.get(name)?.let { String(it, Charsets.UTF_8) } } },
+                log = log,
+            )
+        val pluginManager = HebePluginManager(pluginsDir, pluginLifecycle)
+        pluginManager.loadPlugins()
+        pluginManager.startPlugins()
 
         // ── Shutdown ───────────────────────────────────────────────────────
 
@@ -232,58 +278,101 @@ object AgentFactory {
 
     private fun registerBuiltinTools(
         registry: ToolRegistry,
-        workspaceRoot: Path,
+        workspaceFs: WorkspaceFs,
     ) {
-        registry.register(FileSystemReadTool(workspaceRoot))
-        registry.register(FileSystemWriteTool(workspaceRoot))
-        registry.register(FileSystemAppendTool(workspaceRoot))
-        registry.register(FileSystemListTool(workspaceRoot))
-        registry.register(FileSystemGlobTool(workspaceRoot))
-        registry.register(ShellTool(workspaceRoot))
+        registry.register(FileSystemReadTool(workspaceFs))
+        registry.register(FileSystemWriteTool(workspaceFs))
+        registry.register(FileSystemAppendTool(workspaceFs))
+        registry.register(FileSystemListTool(workspaceFs))
+        registry.register(FileSystemGlobTool(workspaceFs))
+        registry.register(ShellTool(workspaceFs.workspaceRoot))
         registry.register(HttpTool(buildSecretLookupForBuiltin(secretStoreProviderForTools())))
         registry.register(AskUserTool())
     }
 
     private fun buildSecretLookup(secretStore: SecretStoreProvider): SecretLookup =
         object : SecretLookup {
-            override fun secret(name: String): String? =
-                runBlocking { secretStore.get(name)?.let { String(it, Charsets.UTF_8) } }
+            override fun secret(name: String): String? = runBlocking { secretStore.get(name)?.let { String(it, Charsets.UTF_8) } }
         }
 
     private fun buildSecretLookupForBuiltin(secretStore: SecretStoreProvider): com.hebe.api.SecretLookup =
         object : com.hebe.api.SecretLookup {
-            override fun secret(name: String): String? =
-                runBlocking { secretStore.get(name)?.let { String(it, Charsets.UTF_8) } }
+            override fun secret(name: String): String? = runBlocking { secretStore.get(name)?.let { String(it, Charsets.UTF_8) } }
         }
 
     private fun secretStoreProviderForTools(): SecretStoreProvider =
         object : SecretStoreProvider {
             override suspend fun get(key: String): ByteArray? = null
-            override suspend fun set(key: String, value: ByteArray) {}
+
+            override suspend fun set(
+                key: String,
+                value: ByteArray,
+            ) {}
+
             override suspend fun delete(key: String): Boolean = false
+
             override suspend fun list(): List<String> = emptyList()
         }
 
     private val dummyChannel: Channel =
         object : Channel {
             override val name: String = "agent-factory"
+
             override suspend fun start(scope: CoroutineScope): Flow<IncomingMessage> = flowOf()
-            override suspend fun reply(ctx: ReplyContext, msg: OutboundMessage) {}
+
+            override suspend fun reply(
+                ctx: ReplyContext,
+                msg: OutboundMessage,
+            ) {}
+
             override fun supportsDraftUpdates(): Boolean = false
-            override suspend fun updateDraft(ctx: ReplyContext, partial: String) {}
-            override suspend fun broadcast(userId: String, msg: OutboundMessage) {}
+
+            override suspend fun updateDraft(
+                ctx: ReplyContext,
+                partial: String,
+            ) {}
+
+            override suspend fun broadcast(
+                userId: String,
+                msg: OutboundMessage,
+            ) {}
+
             override suspend fun healthCheck(): ChannelHealth = ChannelHealth.Up
+
             override suspend fun shutdown() {}
         }
 
     private class MemoryStorePlaceholder : MemoryStore {
-        override suspend fun appendMessage(conversationId: String, msg: com.hebe.api.ConversationMessage) {}
-        override suspend fun loadContext(conversationId: String, limit: Int): List<com.hebe.api.ConversationMessage> = emptyList()
-        override suspend fun search(query: String, k: Int, scope: com.hebe.api.MemoryScope, categories: Set<com.hebe.api.MemoryCategory>?): List<com.hebe.api.MemoryHit> = emptyList()
-        override suspend fun appendDoc(path: String, content: String, scope: com.hebe.api.MemoryScope, category: com.hebe.api.MemoryCategory) {}
+        override suspend fun appendMessage(
+            conversationId: String,
+            msg: com.hebe.api.ConversationMessage,
+        ) {}
+
+        override suspend fun loadContext(
+            conversationId: String,
+            limit: Int,
+        ): List<com.hebe.api.ConversationMessage> = emptyList()
+
+        override suspend fun search(
+            query: String,
+            k: Int,
+            scope: com.hebe.api.MemoryScope,
+            categories: Set<com.hebe.api.MemoryCategory>?,
+        ): List<com.hebe.api.MemoryHit> = emptyList()
+
+        override suspend fun appendDoc(
+            path: String,
+            content: String,
+            scope: com.hebe.api.MemoryScope,
+            category: com.hebe.api.MemoryCategory,
+        ) {}
+
         override suspend fun readDoc(path: String): String? = null
+
         override suspend fun listDocs(prefix: String): List<String> = emptyList()
+
         override suspend fun systemPrompt(isGroup: Boolean): String = ""
+
         override suspend fun snapshot(): com.hebe.api.MemorySnapshot = com.hebe.api.MemorySnapshot(0, 0, 0)
     }
 }

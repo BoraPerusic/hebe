@@ -1,11 +1,11 @@
 package com.hebe.scheduler
 
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
-import kotlin.time.Duration
-import kotlin.time.Duration.Companion.seconds
 
 class JobLoop(
     private val repo: JobRepo,

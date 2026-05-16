@@ -5,10 +5,9 @@ package com.hebe.scheduler.maintenance
 import com.hebe.api.LlmProvider
 import com.hebe.api.StreamEvent
 import com.hebe.memory.db.Db
+import javax.sql.DataSource
 import kotlinx.coroutines.flow.collect
 import org.slf4j.LoggerFactory
-import java.sql.Timestamp
-import javax.sql.DataSource
 
 class EmbeddingRefresh(
     private val db: Db,
@@ -59,29 +58,30 @@ class EmbeddingRefresh(
 
     private fun findChunksWithoutEmbeddings(limit: Int): List<ChunkRow> {
         ds.connection.use { conn ->
-            conn.prepareStatement(
-                """
-                SELECT mc.doc_path, mc.chunk_idx, mc.content
-                FROM memory_chunks mc
-                LEFT JOIN memory_chunks_vec mcv ON mc.doc_path = mcv.doc_path AND mc.chunk_idx = mcv.chunk_idx
-                WHERE mcv.doc_path IS NULL
-                LIMIT ?
-                """.trimIndent(),
-            ).use { ps ->
-                ps.setInt(1, limit)
-                val rs = ps.executeQuery()
-                val chunks = mutableListOf<ChunkRow>()
-                while (rs.next()) {
-                    chunks.add(
-                        ChunkRow(
-                            docPath = rs.getString(1),
-                            chunkIdx = rs.getInt(2),
-                            content = rs.getString(3),
-                        ),
-                    )
+            conn
+                .prepareStatement(
+                    """
+                    SELECT mc.doc_path, mc.chunk_idx, mc.content
+                    FROM memory_chunks mc
+                    LEFT JOIN memory_chunks_vec mcv ON mc.doc_path = mcv.doc_path AND mc.chunk_idx = mcv.chunk_idx
+                    WHERE mcv.doc_path IS NULL
+                    LIMIT ?
+                    """.trimIndent(),
+                ).use { ps ->
+                    ps.setInt(1, limit)
+                    val rs = ps.executeQuery()
+                    val chunks = mutableListOf<ChunkRow>()
+                    while (rs.next()) {
+                        chunks.add(
+                            ChunkRow(
+                                docPath = rs.getString(1),
+                                chunkIdx = rs.getInt(2),
+                                content = rs.getString(3),
+                            ),
+                        )
+                    }
+                    return chunks
                 }
-                return chunks
-            }
         }
     }
 
@@ -98,7 +98,11 @@ class EmbeddingRefresh(
             com.hebe.api.ChatRequest(
                 model = model,
                 systemPrompt = "You are an embedding provider. Return a JSON array of embedding vectors.",
-                messages = listOf(com.hebe.api.ChatMessage.User(prompt)),
+                messages =
+                    listOf(
+                        com.hebe.api.ChatMessage
+                            .User(prompt),
+                    ),
                 tools = emptyList(),
                 temperature = 0.0,
                 stream = false,
@@ -115,59 +119,78 @@ class EmbeddingRefresh(
         return parseEmbeddings(textParts.joinToString(""), chunks.size)
     }
 
-    private fun parseEmbeddings(json: String, count: Int): List<FloatArray> {
+    private fun parseEmbeddings(
+        json: String,
+        count: Int,
+    ): List<FloatArray> {
         if (json.isBlank()) return List(count) { FloatArray(1536) { 0f } }
         return try {
-            val elem = kotlinx.serialization.json.Json.parseToJsonElement(json)
+            val elem =
+                kotlinx.serialization.json.Json
+                    .parseToJsonElement(json)
             val arr = elem as? kotlinx.serialization.json.JsonArray ?: return List(count) { FloatArray(1536) { 0f } }
-            arr.take(count).map { item ->
-                val inner = item as? kotlinx.serialization.json.JsonArray
-                    ?: kotlinx.serialization.json.JsonArray(emptyList())
-                inner.map { v ->
-                    (v as? kotlinx.serialization.json.JsonPrimitive)?.content?.toFloatOrNull() ?: 0f
-                }.toFloatArray()
-            }.ifEmpty { List(count) { FloatArray(1536) { 0f } } }
+            arr
+                .take(count)
+                .map { item ->
+                    val inner =
+                        item as? kotlinx.serialization.json.JsonArray
+                            ?: kotlinx.serialization.json.JsonArray(emptyList())
+                    inner
+                        .map { v ->
+                            (v as? kotlinx.serialization.json.JsonPrimitive)?.content?.toFloatOrNull() ?: 0f
+                        }.toFloatArray()
+                }.ifEmpty { List(count) { FloatArray(1536) { 0f } } }
         } catch (_: Exception) {
             List(count) { FloatArray(1536) { 0f } }
         }
     }
 
-    private fun updateChunkEmbedding(docPath: String, chunkIdx: Int, embedding: FloatArray) {
+    private fun updateChunkEmbedding(
+        docPath: String,
+        chunkIdx: Int,
+        embedding: FloatArray,
+    ) {
         val bytes = embeddingToBytes(embedding)
         ds.connection.use { conn ->
-            conn.prepareStatement(
-                """
-                UPDATE memory_chunks
-                SET embedding = ?
-                WHERE doc_path = ? AND chunk_idx = ?
-                """.trimIndent(),
-            ).use { ps ->
-                val blob = conn.createBlob()
-                blob.setBytes(1, bytes)
-                ps.setBlob(1, blob)
-                ps.setString(2, docPath)
-                ps.setInt(3, chunkIdx)
-                ps.executeUpdate()
-            }
+            conn
+                .prepareStatement(
+                    """
+                    UPDATE memory_chunks
+                    SET embedding = ?
+                    WHERE doc_path = ? AND chunk_idx = ?
+                    """.trimIndent(),
+                ).use { ps ->
+                    val blob = conn.createBlob()
+                    blob.setBytes(1, bytes)
+                    ps.setBlob(1, blob)
+                    ps.setString(2, docPath)
+                    ps.setInt(3, chunkIdx)
+                    ps.executeUpdate()
+                }
         }
     }
 
-    private fun insertVecRow(docPath: String, chunkIdx: Int, embedding: FloatArray) {
+    private fun insertVecRow(
+        docPath: String,
+        chunkIdx: Int,
+        embedding: FloatArray,
+    ) {
         val bytes = embeddingToBytes(embedding)
         ds.connection.use { conn ->
-            conn.prepareStatement(
-                """
-                INSERT OR REPLACE INTO memory_chunks_vec(doc_path, chunk_idx, vector)
-                VALUES (?, ?, ?)
-                """.trimIndent(),
-            ).use { ps ->
-                val blob = conn.createBlob()
-                blob.setBytes(1, bytes)
-                ps.setString(1, docPath)
-                ps.setInt(2, chunkIdx)
-                ps.setBlob(3, blob)
-                ps.executeUpdate()
-            }
+            conn
+                .prepareStatement(
+                    """
+                    INSERT OR REPLACE INTO memory_chunks_vec(doc_path, chunk_idx, vector)
+                    VALUES (?, ?, ?)
+                    """.trimIndent(),
+                ).use { ps ->
+                    val blob = conn.createBlob()
+                    blob.setBytes(1, bytes)
+                    ps.setString(1, docPath)
+                    ps.setInt(2, chunkIdx)
+                    ps.setBlob(3, blob)
+                    ps.executeUpdate()
+                }
         }
     }
 

@@ -8,6 +8,17 @@ application {
     applicationName = "hebe"
 }
 
+tasks.shadowJar {
+    archiveBaseName.set("hebe")
+    archiveClassifier.set("")
+    archiveVersion.set(project.version.takeUnless { it.toString() == "unspecified" }?.toString() ?: "")
+    manifest {
+        attributes["Main-Class"] = "com.hebe.cli.MainKt"
+    }
+    mergeServiceFiles()
+    isZip64 = true
+}
+
 dependencies {
     implementation(libs.clikt)
     implementation(libs.kotlinx.coroutines.core)

@@ -5,18 +5,26 @@ package com.hebe.scheduler.maintenance
 import com.hebe.memory.db.DbFactory
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import kotlinx.coroutines.test.runTest
 import java.sql.Timestamp
+import kotlinx.coroutines.test.runTest
 
-private fun fakeLlmProvider() = object : com.hebe.api.LlmProvider {
-    override suspend fun chat(req: com.hebe.api.ChatRequest) = kotlinx.coroutines.flow.flowOf(
-        com.hebe.api.StreamEvent.TextDelta("This is a summary of the conversation."),
-        com.hebe.api.StreamEvent.Done,
-    )
-    override fun capabilities() = com.hebe.api.ProviderCapabilities(streaming = false, toolUse = false, multimodal = false, maxContextTokens = 0)
-}
+private fun fakeLlmProvider() =
+    object : com.hebe.api.LlmProvider {
+        override suspend fun chat(req: com.hebe.api.ChatRequest) =
+            kotlinx.coroutines.flow.flowOf(
+                com.hebe.api.StreamEvent
+                    .TextDelta("This is a summary of the conversation."),
+                com.hebe.api.StreamEvent.Done,
+            )
 
-private fun insertConversation(db: com.hebe.memory.db.Db, id: String) {
+        override fun capabilities() =
+            com.hebe.api.ProviderCapabilities(streaming = false, toolUse = false, multimodal = false, maxContextTokens = 0)
+    }
+
+private fun insertConversation(
+    db: com.hebe.memory.db.Db,
+    id: String,
+) {
     db.dataSource.connection.use { conn ->
         conn.prepareStatement("INSERT INTO conversations(id, channel, user_id, started_at) VALUES (?, ?, ?, ?)").use { ps ->
             ps.setString(1, id)
@@ -28,10 +36,21 @@ private fun insertConversation(db: com.hebe.memory.db.Db, id: String) {
     }
 }
 
-private fun insertMessage(db: com.hebe.memory.db.Db, convId: String, role: String, content: String, ts: Long) {
+private fun insertMessage(
+    db: com.hebe.memory.db.Db,
+    convId: String,
+    role: String,
+    content: String,
+    ts: Long,
+) {
     db.dataSource.connection.use { conn ->
         conn.prepareStatement("INSERT INTO messages(id, conversation_id, role, content, ts) VALUES (?, ?, ?, ?, ?)").use { ps ->
-            ps.setString(1, java.util.UUID.randomUUID().toString())
+            ps.setString(
+                1,
+                java.util.UUID
+                    .randomUUID()
+                    .toString(),
+            )
             ps.setString(2, convId)
             ps.setString(3, role)
             ps.setString(4, content)
@@ -41,43 +60,50 @@ private fun insertMessage(db: com.hebe.memory.db.Db, convId: String, role: Strin
     }
 }
 
-class SummariserTest : StringSpec({
-    "loadActiveConversations finds conversations with messages" {
-        runTest {
-            val db = DbFactory.openInMemory()
-            insertConversation(db, "conv1")
-            insertMessage(db, "conv1", "user", "hello world test content here", System.currentTimeMillis() - 3600_000)
-            val summariser = Summariser(db, fakeLlmProvider())
-            val result = summariser.run()
-            result.isSuccess shouldBe true
-            db.close()
-        }
-    }
-
-    "summariser skips conversations with no messages" {
-        runTest {
-            val db = DbFactory.openInMemory()
-            insertConversation(db, "empty-conv")
-            val summariser = Summariser(db, fakeLlmProvider())
-            val result = summariser.run()
-            result.isSuccess shouldBe true
-            result.getOrNull() shouldBe 0
-            db.close()
-        }
-    }
-
-    "summariser processes conversations with sufficient messages" {
-        runTest {
-            val db = DbFactory.openInMemory()
-            insertConversation(db, "conv1")
-            val baseTs = System.currentTimeMillis() - 3600_000
-            repeat(5) { i ->
-                insertMessage(db, "conv1", "user", "message content number $i with sufficient tokens to pass threshold", baseTs + i * 60_000)
+class SummariserTest :
+    StringSpec({
+        "loadActiveConversations finds conversations with messages" {
+            runTest {
+                val db = DbFactory.openInMemory()
+                insertConversation(db, "conv1")
+                insertMessage(db, "conv1", "user", "hello world test content here", System.currentTimeMillis() - 3600_000)
+                val summariser = Summariser(db, fakeLlmProvider())
+                val result = summariser.run()
+                result.isSuccess shouldBe true
+                db.close()
             }
-            val summariser = Summariser(db, fakeLlmProvider())
-            val result = summariser.run()
-            result.isSuccess shouldBe true
-            db.close()
         }
-    }
-})
+
+        "summariser skips conversations with no messages" {
+            runTest {
+                val db = DbFactory.openInMemory()
+                insertConversation(db, "empty-conv")
+                val summariser = Summariser(db, fakeLlmProvider())
+                val result = summariser.run()
+                result.isSuccess shouldBe true
+                result.getOrNull() shouldBe 0
+                db.close()
+            }
+        }
+
+        "summariser processes conversations with sufficient messages" {
+            runTest {
+                val db = DbFactory.openInMemory()
+                insertConversation(db, "conv1")
+                val baseTs = System.currentTimeMillis() - 3600_000
+                repeat(5) { i ->
+                    insertMessage(
+                        db,
+                        "conv1",
+                        "user",
+                        "message content number $i with sufficient tokens to pass threshold",
+                        baseTs + i * 60_000,
+                    )
+                }
+                val summariser = Summariser(db, fakeLlmProvider())
+                val result = summariser.run()
+                result.isSuccess shouldBe true
+                db.close()
+            }
+        }
+    })

@@ -4,7 +4,6 @@ package com.hebe.scheduler.maintenance
 
 import com.hebe.api.ApprovalGate
 import com.hebe.api.Channel
-import com.hebe.api.ChatMessage
 import com.hebe.api.ChatRole
 import com.hebe.api.ConversationMessage
 import com.hebe.api.LoopConfig
@@ -14,21 +13,18 @@ import com.hebe.api.OutboundMessage
 import com.hebe.api.Reasoning
 import com.hebe.api.ReasoningContext
 import com.hebe.api.SecretLookup
-import com.hebe.core.delegate.JobDelegate
 import com.hebe.api.workspace.WorkspacePath
+import com.hebe.core.delegate.JobDelegate
 import com.hebe.scheduler.DenyAllApprovalGate
 import com.hebe.scheduler.Services
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.JsonObject
-import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.UUID
 import kotlin.time.Clock
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import org.slf4j.LoggerFactory
 
 class Heartbeat(
     private val services: Services,
@@ -52,7 +48,10 @@ class Heartbeat(
     }
 
     interface NotifyChannel {
-        suspend fun notify(title: String, body: String)
+        suspend fun notify(
+            title: String,
+            body: String,
+        )
     }
 
     data class Config(
@@ -158,10 +157,17 @@ class Heartbeat(
             override val requestor: Channel =
                 object : Channel {
                     override val name: String = "heartbeat"
+
                     override suspend fun start(scope: CoroutineScope): Flow<com.hebe.api.IncomingMessage> = flow { }
+
                     @Suppress("EmptyFunctionBlock")
-                    override suspend fun reply(ctx: com.hebe.api.ReplyContext, msg: com.hebe.api.OutboundMessage) {}
+                    override suspend fun reply(
+                        ctx: com.hebe.api.ReplyContext,
+                        msg: com.hebe.api.OutboundMessage,
+                    ) {}
+
                     override suspend fun healthCheck(): com.hebe.api.ChannelHealth = com.hebe.api.ChannelHealth.Up
+
                     @Suppress("EmptyFunctionBlock")
                     override suspend fun shutdown() {}
                 }
@@ -176,7 +182,11 @@ class Heartbeat(
 
     class ConsoleNotifyChannel : NotifyChannel {
         private val logger = org.slf4j.LoggerFactory.getLogger(ConsoleNotifyChannel::class.java)
-        override suspend fun notify(title: String, body: String) {
+
+        override suspend fun notify(
+            title: String,
+            body: String,
+        ) {
             logger.warn("[HEARTBEAT ALERT] {}: {}", title, body)
         }
     }

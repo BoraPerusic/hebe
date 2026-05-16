@@ -40,5 +40,8 @@ object DenyAllApprovalGate : ApprovalGate {
         threadExtId: String?,
     ): Boolean = false
 
-    override fun resolve(approvalId: String, approved: Boolean): Boolean = false
+    override fun resolve(
+        approvalId: String,
+        approved: Boolean,
+    ): Boolean = false
 }
