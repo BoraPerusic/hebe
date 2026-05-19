@@ -5,6 +5,7 @@ package com.hebe.memory.search
 import com.hebe.api.MemoryCategory
 import com.hebe.api.MemoryHit
 import com.hebe.api.MemoryScope
+import com.hebe.api.Observer
 import com.hebe.memory.db.Db
 import com.hebe.memory.embeddings.EmbeddingProvider
 import kotlinx.coroutines.Dispatchers
@@ -13,6 +14,7 @@ import kotlinx.coroutines.withContext
 class Searcher(
     private val db: Db,
     private val embeddings: EmbeddingProvider,
+    private val observer: Observer? = null,
 ) {
     companion object {
         private const val COL_DOC_PATH = 1
@@ -35,18 +37,25 @@ class Searcher(
         categories: Set<MemoryCategory>? = null,
     ): List<MemoryHit> =
         withContext(Dispatchers.IO) {
-            val ftsHits = ftsQuery(query, k * DEFAULT_LIMIT, scope, categories)
-            val vecHits =
-                try {
-                    val queryVec = embeddings.embed(listOf(query)).first()
-                    vecQuery(queryVec, k * DEFAULT_LIMIT, scope, categories)
-                } catch (
-                    @Suppress("TooGenericExceptionCaught") ex: Exception,
-                ) {
-                    System.err.println("Warning: vec search failed: ${ex.message}")
-                    emptyList()
-                }
-            Rrf.fuse(ftsHits, vecHits, k0 = K0, k = k)
+            val span = observer?.span("memory.search", mapOf("query.length" to query.length, "k" to k))
+            try {
+                val ftsHits = ftsQuery(query, k * DEFAULT_LIMIT, scope, categories)
+                val vecHits =
+                    try {
+                        val queryVec = embeddings.embed(listOf(query)).first()
+                        vecQuery(queryVec, k * DEFAULT_LIMIT, scope, categories)
+                    } catch (
+                        @Suppress("TooGenericExceptionCaught") ex: Exception,
+                    ) {
+                        System.err.println("Warning: vec search failed: ${ex.message}")
+                        emptyList()
+                    }
+                val result = Rrf.fuse(ftsHits, vecHits, k0 = K0, k = k)
+                span?.setAttribute("results", result.size)
+                result
+            } finally {
+                span?.close()
+            }
         }
 
     private fun ftsQuery(

@@ -46,7 +46,8 @@ class PidFile private constructor(
                                 "unknown"
                             }
                         channel.close()
-                        error("hebe is already running (pid=$existingPid). Aborting.")
+                        System.err.println("hebe is already running (pid=$existingPid). Aborting.")
+                        kotlin.system.exitProcess(1)
                     }
             val pid = ProcessHandle.current().pid()
             channel.truncate(0)

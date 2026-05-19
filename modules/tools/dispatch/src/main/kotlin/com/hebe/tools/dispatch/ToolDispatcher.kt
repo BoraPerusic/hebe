@@ -102,6 +102,10 @@ class ToolDispatcher(
                     }
 
                 val scanned = leakDetector.scan(raw)
+                val ok = scanned is ToolResult.Ok
+                span.setAttribute("tool.name", call.name)
+                span.setAttribute("risk", tool.risk.name)
+                span.setAttribute("ok", ok)
                 writeReceiptAndMemory(call, scanned, ctx, span, tool, startMs)
                 return DispatchOutcome.Result(scanned)
             }

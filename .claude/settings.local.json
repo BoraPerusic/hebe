@@ -87,7 +87,12 @@
       "Bash(just lint *)",
       "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(item['text']\\) for item in data if item['type']=='text']\")",
       "Bash(grep *)",
-      "Bash(xargs cat -n)"
+      "Bash(xargs cat -n)",
+      "Bash(chmod +x *)",
+      "Read(//dev/**)",
+      "Bash(sed -n '535,545p' /Users/bora/Dev/hebe/modules/cli-app/src/main/kotlin/com/hebe/cli/Main.kt)",
+      "Bash(java -jar /Users/bora/Dev/hebe/modules/cli-app/build/libs/hebe.jar --help)",
+      "Bash(just build *)"
     ]
   }
 }

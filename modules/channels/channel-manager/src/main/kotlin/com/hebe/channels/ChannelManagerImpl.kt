@@ -162,6 +162,7 @@ class ChannelManagerImpl(
     ) {
         val channel = channelMutex.withLock { channels[msg.channel] }
         if (channel != null) {
+            val replySpan = observer.span("channel.reply", mapOf("channel.name" to channel.name))
             channel.reply(
                 com.hebe.api.ReplyContext(
                     incomingId = msg.id,
@@ -170,6 +171,7 @@ class ChannelManagerImpl(
                 ),
                 outcome.reply,
             )
+            replySpan.close()
         }
         observer.event(ObserverEvent.TurnEnd(sessionId = effectiveSessionId, turnId = turnId, outcome = "done"))
     }

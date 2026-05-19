@@ -41,16 +41,20 @@ fun platformService(dataDir: Path): PlatformService {
 private class UnsupportedPlatformService(
     private val os: String,
 ) : PlatformService {
+    /**
+     * Windows does not support launchd or systemd-based service management.
+     * Use a third-party service manager like NSSM or Windows Service Wrapper instead.
+     */
     override fun install(
         jarPath: String,
         javaPath: String,
-    ) = Result.failure<Unit>(UnsupportedOperationException("Service management not supported on $os"))
+    ) = Result.failure<Unit>(UnsupportedOperationException("Service management not supported on $os (Windows). Use a third-party service manager like NSSM."))
 
-    override fun uninstall() = Result.failure<Unit>(UnsupportedOperationException("Service management not supported on $os"))
+    override fun uninstall() = Result.failure<Unit>(UnsupportedOperationException("Service management not supported on $os (Windows). Use a third-party service manager like NSSM."))
 
-    override fun start() = Result.failure<Unit>(UnsupportedOperationException("Service management not supported on $os"))
+    override fun start() = Result.failure<Unit>(UnsupportedOperationException("Service management not supported on $os (Windows). Use a third-party service manager like NSSM."))
 
-    override fun stop() = Result.failure<Unit>(UnsupportedOperationException("Service management not supported on $os"))
+    override fun stop() = Result.failure<Unit>(UnsupportedOperationException("Service management not supported on $os (Windows). Use a third-party service manager like NSSM."))
 
     override fun status() = ServiceStatus.NotInstalled
 }

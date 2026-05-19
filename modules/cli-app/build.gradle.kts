@@ -38,6 +38,11 @@ dependencies {
     implementation(project(":modules:memory"))
     implementation(project(":modules:providers:openai-compat"))
     implementation(project(":modules:tools:builtin"))
+    implementation(project(":modules:memory"))
     implementation(project(":modules:scheduler"))
+    implementation(project(":modules:tools:mcp-client"))
+    implementation(project(":modules:providers:openai-compat"))
+    implementation(libs.telegrambots.longpolling)
+    implementation(libs.telegrambots.client.jetty)
     implementation(libs.ktor.server.core)
 }

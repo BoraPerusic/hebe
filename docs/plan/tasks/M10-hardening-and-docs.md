@@ -10,7 +10,7 @@ References: [`../v1-specs.md`](../v1-specs.md) §5; [`../v1-architecture.md`](..
 
 ## M10.T1 — README.md (install + minimal config)
 
-**Status**: pending  
+**Status**: done  
 **Size**: S  
 **Depends on**: M9.T4 (onboarding)  
 **Blocks**: M10.T2
@@ -60,7 +60,7 @@ A 10-line quickstart at the top of the repo's `README.md` that takes a new user 
 
 ## M10.T2 — Quickstart guide (10-minute happy path)
 
-**Status**: pending  
+**Status**: done  
 **Size**: M  
 **Depends on**: M10.T1  
 **Blocks**: nothing
@@ -107,7 +107,7 @@ A longer step-by-step guide: clone → build → onboard → first chat → firs
 
 ## M10.T3 — Plugin protocol spec doc
 
-**Status**: pending  
+**Status**: done  
 **Size**: M  
 **Depends on**: M6.T11, M6.T13  
 **Blocks**: nothing
@@ -149,7 +149,7 @@ A formal document covering the plugin authoring contract: manifest, classloader 
 
 ## M10.T4 — MCP integration guide
 
-**Status**: pending  
+**Status**: done  
 **Size**: M  
 **Depends on**: M7.T6  
 **Blocks**: nothing
@@ -198,7 +198,7 @@ How to: (a) point Claude Desktop / Cursor / Windsurf at `hebe mcp serve`; (b) co
 
 ## M10.T5 — Security model doc
 
-**Status**: pending  
+**Status**: done  
 **Size**: M  
 **Depends on**: M3.T11  
 **Blocks**: M10.T8
@@ -240,7 +240,7 @@ Single document covering autonomy levels, sandbox posture, receipts, plugin trus
 
 ## M10.T6 — Per-channel setup guide — Telegram
 
-**Status**: pending  
+**Status**: done  
 **Size**: S  
 **Depends on**: M5.T9  
 **Blocks**: nothing
@@ -284,7 +284,7 @@ Step-by-step Telegram setup: BotFather → token → operator id → wired up vi
 
 ---
 
-## M10.T7 — Soak test (7-day continuous run)
+## M10.T7 — Soak test (7-day continuous run) - SKIP THIS, THE USER WILL DO THIS
 
 **Status**: pending  
 **Size**: L  
@@ -342,7 +342,7 @@ Per `v1-tasks.md` cut lines, soak duration can shrink to 48 h if schedule slips.
 
 ## M10.T8 — Security review checklist
 
-**Status**: pending  
+**Status**: done  
 **Size**: M  
 **Depends on**: M10.T5  
 **Blocks**: M10.T10
@@ -390,7 +390,7 @@ A self-audit checklist covering every item in `v1-architecture.md` §22, verifie
 
 ## M10.T9 — RFC process scaffold
 
-**Status**: pending  
+**Status**: done  
 **Size**: S  
 **Depends on**: M10.T1  
 **Blocks**: nothing direct
@@ -423,9 +423,84 @@ A template + README for proposing substantive changes once contributors arrive (
 
 ---
 
-## M10.T10 — Internal acceptance run-through against `v1-specs.md` §5
+## M10.T10 — Plugin Developer's Guide
 
-**Status**: pending  
+**Status**: done  
+**Size**: S  
+**Depends on**: M10.T1  
+**Blocks**: nothing direct
+
+### Goal
+
+A template + Guide for plugin developers, covering best practices, API documentation, and contributing guidelines. How to develop and test your plugin.
+
+### Files to create
+
+- `docs/plugins/0000-template.md` (new)
+- `docs/plugins/Developer Guide.md` (new)
+
+### Detailed work
+
+1. **Template**: title, summary, motivation, design, alternatives considered, drawbacks, prior art, unresolved questions.
+
+2. **Guide**: a complete guide to develop the Hebe plugin. Setup, start, development, testing, deployment.
+
+3. Number assignment: the next sequential digit (0001, 0002, …).
+
+### Acceptance criteria
+
+- ✅ Template committed.
+- ✅ Process documented.
+
+### References
+
+- `v1-specs.md` §2.13
+
+---
+
+## M10.T11 — Hebe Usage Examples
+
+**Status**: done  
+**Size**: S  
+**Depends on**: M10.T1  
+**Blocks**: nothing direct
+
+### Goal
+
+A document with a set of example use cases how to use Hebe for specific tasks.
+
+### Files to create
+
+- `docs/examples/Hebe Examples.md` (new)
+
+### Detailed work
+
+1. **Hebe Examples**: title, summary, motivation. Samples of the following use case:
+    - **Secure File Transfer**: How to securely transfer files between two systems using Hebe's secure channels.
+    - **Data Encryption**: How to encrypt sensitive data using Hebe's cryptographic primitives.
+    - **Secure Communication**: How to establish secure communication channels between applications using Hebe's secure messaging protocol.
+    - **Daily Read Summarizer**: How to use Hebe for summarizing the daily reads: internet article source (like "Medium", "Hacker News", etc.), daily sumamriZation of new articles at 4 A.M
+    - **Email Categorizer**: How to use Hebe to flag and categorize your inbox
+    - **Telegram**: How to set Hebe up as your Telegram conversation butler
+
+2. **README**: when an RFC is needed (e.g. changes to kernel ABI, new permission, new channel category, security model changes); how to propose one (open a PR adding a new RFC file).
+
+3. Number assignment: the next sequential digit (0001, 0002, …).
+
+### Acceptance criteria
+
+- ✅ Template committed.
+- ✅ Process documented.
+
+### References
+
+- `v1-specs.md` §2.13
+
+---
+
+## M10.T12 — Internal acceptance run-through against `v1-specs.md` §5
+
+**Status**: done  
 **Size**: L  
 **Depends on**: every other M* task  
 **Blocks**: shipping v1

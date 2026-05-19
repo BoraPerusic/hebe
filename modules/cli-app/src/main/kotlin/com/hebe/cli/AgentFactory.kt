@@ -28,6 +28,9 @@ import com.hebe.core.submission.SubmissionParser
 import com.hebe.memory.db.DbFactory
 import com.hebe.memory.workspace.WorkspaceFs
 import com.hebe.memory.workspace.WorkspaceSeeder
+import com.hebe.memory.embeddings.CachedEmbeddingProvider
+import com.hebe.memory.embeddings.OpenAiCompatEmbeddingProvider
+import com.hebe.memory.hygiene.HygieneScanner
 import com.hebe.plugins.HebePluginManager
 import com.hebe.plugins.Lifecycle
 import com.hebe.plugins.PluginRegistrationStore
@@ -47,10 +50,18 @@ import com.hebe.tools.builtin.file.FileSystemGlobTool
 import com.hebe.tools.builtin.file.FileSystemListTool
 import com.hebe.tools.builtin.file.FileSystemReadTool
 import com.hebe.tools.builtin.file.FileSystemWriteTool
+import com.hebe.tools.builtin.git.GitTool
 import com.hebe.tools.builtin.http.HttpTool
+import com.hebe.tools.builtin.memory.MemoryReadTool
+import com.hebe.tools.builtin.memory.MemorySearchTool
+import com.hebe.tools.builtin.memory.MemoryWriteTool
+import com.hebe.tools.builtin.schedule.ScheduleTool
+import com.hebe.tools.builtin.search.WebSearchTool
 import com.hebe.tools.builtin.shell.ShellTool
 import com.hebe.tools.dispatch.ToolDispatcher
 import com.hebe.tools.dispatch.ToolRegistry
+import com.hebe.tools.mcp.McpClientManager
+import com.hebe.memory.SqliteMemoryStore
 import java.nio.file.Path
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -65,6 +76,7 @@ object AgentFactory {
         val dispatcher: ToolDispatcher,
         val channelManager: ChannelManagerImpl,
         val webChannel: WebChannel,
+        val telegramChannel: TelegramChannel?,
         val scheduler: SchedulerFacade?,
         val mcpClientManager: McpClientManagerFacade?,
         val shutdown: suspend () -> Unit,
@@ -115,14 +127,33 @@ object AgentFactory {
                 httpClient = httpClient,
             )
 
-        // ── Memory store (placeholder - SqliteMemoryStore needs more deps) ──
-        // TODO: properly construct SqliteMemoryStore with EmbeddingProvider + HygieneScanner
-        val memoryStore: MemoryStore = MemoryStorePlaceholder()
+        // ── Memory store ────────────────────────────────────────────────────
+
+        val embeddingProvider =
+            CachedEmbeddingProvider(
+                OpenAiCompatEmbeddingProvider(
+                    client = httpClient,
+                    baseUrl = config.llm.baseUrl,
+                    apiKey = llmApiKey,
+                    model = config.llm.embeddingModel.ifEmpty { "text-embedding-3-small" },
+                    dim = config.llm.embeddingDim,
+                ),
+            )
+        val hygieneScanner = HygieneScanner()
+        val memoryStore: MemoryStore =
+            SqliteMemoryStore(
+                db = memoryDb,
+                workspaceFs = workspaceFs,
+                embeddings = embeddingProvider,
+                hygieneScanner = hygieneScanner,
+                observer = observer,
+            )
 
         // ── Tool stack ────────────────────────────────────────────────────
 
         val registry = ToolRegistry()
-        registerBuiltinTools(registry, workspaceFs)
+        val secretLookup = buildSecretLookup(secretStore)
+        registerBuiltinTools(registry, workspaceFs, secretLookup, memoryStore)
 
         val validators = PolicyChain.standard(config, workspaceRoot)
 
@@ -177,8 +208,10 @@ object AgentFactory {
 
         // ── Build agent ───────────────────────────────────────────────────
 
-        val secretLookup = buildSecretLookup(secretStore)
+        val secretLookupForAgent = buildSecretLookup(secretStore)
         val systemPrompt = "You are Hebe, a local AI agent. Running with autonomy level: ${config.autonomy.level.name}."
+
+        val agentToolsProvider = registry::list
 
         val agent =
             HebeAgent(
@@ -197,10 +230,10 @@ object AgentFactory {
                         .HookRunner(),
                 observer = observer,
                 approvalGate = approvalGate,
-                secretLookup = secretLookup,
+                secretLookup = secretLookupForAgent,
                 secretStore = secretStore,
                 systemPrompt = systemPrompt,
-                toolsProvider = { _ -> emptyList() },
+                toolsProvider = { _ -> agentToolsProvider().map { it.spec } },
                 activeSkills = emptyList(),
             )
 
@@ -252,12 +285,57 @@ object AgentFactory {
         pluginManager.loadPlugins()
         pluginManager.startPlugins()
 
+        // ── Scheduler ─────────────────────────────────────────────────────
+
+        val jobRepo = com.hebe.scheduler.JobRepo(memoryDb)
+        val routinesEngine = com.hebe.scheduler.RoutinesEngine(jobRepo)
+        val jobRunner =
+            com.hebe.scheduler.JobRunner(
+                repo = jobRepo,
+                memory = memoryStore,
+                dispatcher = dispatcher,
+                llmProvider = llmProvider,
+                costGuard = costGuard,
+                compactor = compactor,
+                observer = observer,
+                modelName = config.llm.defaultModel,
+                systemPrompt = systemPrompt,
+                tools = registry.list().map { it.spec },
+            )
+        val schedulerImpl = com.hebe.scheduler.Scheduler(jobRepo, jobRunner, routinesEngine)
+        val schedulerFacade =
+            object : SchedulerFacade {
+                override fun start(scope: CoroutineScope) {
+                    schedulerImpl.start(scope)
+                }
+            }
+
+        // ── MCP client ─────────────────────────────────────────────────────
+
+        val mcpClientManagerImpl =
+            McpClientManager(
+                registry = registry,
+                secretLookup = secretLookup,
+            )
+        runBlocking {
+            if (config.mcp.client.servers.isNotEmpty()) {
+                mcpClientManagerImpl.connect(config.mcp.client.servers)
+            }
+        }
+        val mcpClientManagerFacade =
+            object : McpClientManagerFacade {
+                override suspend fun disconnectAll() {
+                    mcpClientManagerImpl.disconnectAll()
+                }
+            }
+
         // ── Shutdown ───────────────────────────────────────────────────────
 
         val shutdown: suspend () -> Unit = {
             log.info("shutting down agent components")
             runBlocking {
                 channelManager.shutdown()
+                mcpClientManagerImpl.disconnectAll()
                 memoryDb.close()
                 pluginManager.stopPlugins()
                 pluginManager.unloadPlugins()
@@ -270,8 +348,9 @@ object AgentFactory {
             dispatcher = dispatcher,
             channelManager = channelManager,
             webChannel = webChannel,
-            scheduler = null,
-            mcpClientManager = null,
+            telegramChannel = telegramChannel,
+            scheduler = schedulerFacade,
+            mcpClientManager = mcpClientManagerFacade,
             shutdown = shutdown,
         )
     }
@@ -279,6 +358,8 @@ object AgentFactory {
     private fun registerBuiltinTools(
         registry: ToolRegistry,
         workspaceFs: WorkspaceFs,
+        secretLookup: com.hebe.api.SecretLookup,
+        memoryStore: MemoryStore,
     ) {
         registry.register(FileSystemReadTool(workspaceFs))
         registry.register(FileSystemWriteTool(workspaceFs))
@@ -286,32 +367,19 @@ object AgentFactory {
         registry.register(FileSystemListTool(workspaceFs))
         registry.register(FileSystemGlobTool(workspaceFs))
         registry.register(ShellTool(workspaceFs.workspaceRoot))
-        registry.register(HttpTool(buildSecretLookupForBuiltin(secretStoreProviderForTools())))
+        registry.register(HttpTool(secretLookup))
         registry.register(AskUserTool())
+        registry.register(WebSearchTool(secretLookup))
+        registry.register(MemoryReadTool(memoryStore))
+        registry.register(MemoryWriteTool(memoryStore))
+        registry.register(MemorySearchTool(memoryStore))
+        registry.register(ScheduleTool())
+        registry.register(GitTool(workspaceFs.workspaceRoot))
     }
 
-    private fun buildSecretLookup(secretStore: SecretStoreProvider): SecretLookup =
-        object : SecretLookup {
-            override fun secret(name: String): String? = runBlocking { secretStore.get(name)?.let { String(it, Charsets.UTF_8) } }
-        }
-
-    private fun buildSecretLookupForBuiltin(secretStore: SecretStoreProvider): com.hebe.api.SecretLookup =
+    private fun buildSecretLookup(secretStore: SecretStoreProvider): com.hebe.api.SecretLookup =
         object : com.hebe.api.SecretLookup {
             override fun secret(name: String): String? = runBlocking { secretStore.get(name)?.let { String(it, Charsets.UTF_8) } }
-        }
-
-    private fun secretStoreProviderForTools(): SecretStoreProvider =
-        object : SecretStoreProvider {
-            override suspend fun get(key: String): ByteArray? = null
-
-            override suspend fun set(
-                key: String,
-                value: ByteArray,
-            ) {}
-
-            override suspend fun delete(key: String): Boolean = false
-
-            override suspend fun list(): List<String> = emptyList()
         }
 
     private val dummyChannel: Channel =
@@ -341,38 +409,4 @@ object AgentFactory {
 
             override suspend fun shutdown() {}
         }
-
-    private class MemoryStorePlaceholder : MemoryStore {
-        override suspend fun appendMessage(
-            conversationId: String,
-            msg: com.hebe.api.ConversationMessage,
-        ) {}
-
-        override suspend fun loadContext(
-            conversationId: String,
-            limit: Int,
-        ): List<com.hebe.api.ConversationMessage> = emptyList()
-
-        override suspend fun search(
-            query: String,
-            k: Int,
-            scope: com.hebe.api.MemoryScope,
-            categories: Set<com.hebe.api.MemoryCategory>?,
-        ): List<com.hebe.api.MemoryHit> = emptyList()
-
-        override suspend fun appendDoc(
-            path: String,
-            content: String,
-            scope: com.hebe.api.MemoryScope,
-            category: com.hebe.api.MemoryCategory,
-        ) {}
-
-        override suspend fun readDoc(path: String): String? = null
-
-        override suspend fun listDocs(prefix: String): List<String> = emptyList()
-
-        override suspend fun systemPrompt(isGroup: Boolean): String = ""
-
-        override suspend fun snapshot(): com.hebe.api.MemorySnapshot = com.hebe.api.MemorySnapshot(0, 0, 0)
-    }
 }

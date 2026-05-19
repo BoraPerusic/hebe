@@ -28,11 +28,17 @@ import com.hebe.security.estop.EstopIpc
 import com.hebe.security.receipts.ReceiptVerifier
 import com.hebe.security.receipts.VerifyResult
 import java.net.HttpURLConnection
+import java.security.MessageDigest
 import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.Base64
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
+import com.hebe.api.Observer
+import com.hebe.api.SecretLookup
 import kotlin.io.path.exists
 import kotlin.io.path.readText
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +46,21 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
+
+private fun loadConfigOrDefault(path: java.nio.file.Path): HebeConfig =
+    if (java.nio.file.Files.exists(path)) {
+        com.hebe.config.ConfigLoader().load(path).let { result ->
+            when (result) {
+                is com.hebe.config.ConfigResult.Ok -> result.value
+                is com.hebe.config.ConfigResult.Error -> {
+                    System.err.println("Warning: failed to load config, using defaults")
+                    HebeConfig.default()
+                }
+            }
+        }
+    } else {
+        HebeConfig.default()
+    }
 
 fun main(args: Array<String>) {
     HebeCLI().main(args)
@@ -58,6 +79,7 @@ class HebeCLI : CliktCommand(name = "hebe") {
             ServiceStartCommand(),
             ServiceStopCommand(),
             ServiceUninstallCommand(),
+            ServiceStatusCommand(),
             StatusCommand(),
             CompletionBashCommand(),
             CompletionZshCommand(),
@@ -111,12 +133,13 @@ class RunCommand : CliktCommand(name = "run") {
         val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
         runBlocking {
-            channelWiring.registerChannels(components.channelManager)
+            channelWiring.registerChannels(components.channelManager, components.telegramChannel)
         }
         components.channelManager.start(scope)
+        components.scheduler?.start(scope)
 
         val pidFile = PidFile.acquire(workspaceRoot.resolve("hebe.pid"))
-        Shutdown.installHook(pidFile) {
+        Shutdown.installHook(scope, pidFile) {
             log.info("draining in-flight turns")
             components.shutdown()
         }
@@ -136,7 +159,7 @@ class McpServeCommand : CliktCommand(name = "mcp serve") {
             .of(System.getProperty("user.home"), ".hebe", "config.toml")
 
     override fun run() {
-        val hebeConfig = loadConfig()
+        val hebeConfig = loadConfigOrDefault(configPath)
         val mcpConfig = hebeConfig.mcp.server
         if (!mcpConfig.stdio) {
             echo("Stdio MCP server disabled in config")
@@ -192,25 +215,6 @@ class McpServeCommand : CliktCommand(name = "mcp serve") {
             key
         }
     }
-
-    private fun loadConfig(): com.hebe.config.HebeConfig =
-        if (java.nio.file.Files
-                .exists(configPath)
-        ) {
-            com.hebe.config.ConfigLoader().load(configPath).let { result ->
-                when (result) {
-                    is com.hebe.config.ConfigResult.Ok -> result.value
-                    is com.hebe.config.ConfigResult.Error -> {
-                        System.err.println("Warning: failed to load config, using defaults")
-                        com.hebe.config.HebeConfig
-                            .default()
-                    }
-                }
-            }
-        } else {
-            com.hebe.config.HebeConfig
-                .default()
-        }
 }
 
 class PluginInstallCommand : CliktCommand(name = "plugin install") {
@@ -220,23 +224,7 @@ class PluginInstallCommand : CliktCommand(name = "plugin install") {
         java.nio.file.Path
             .of(System.getProperty("user.home"), ".hebe", "config.toml")
     private val hebeConfig: com.hebe.config.HebeConfig by lazy {
-        if (java.nio.file.Files
-                .exists(configPath)
-        ) {
-            com.hebe.config.ConfigLoader().load(configPath).let { result ->
-                when (result) {
-                    is com.hebe.config.ConfigResult.Ok -> result.value
-                    is com.hebe.config.ConfigResult.Error -> {
-                        System.err.println("Warning: failed to load config, using defaults")
-                        com.hebe.config.HebeConfig
-                            .default()
-                    }
-                }
-            }
-        } else {
-            com.hebe.config.HebeConfig
-                .default()
-        }
+        loadConfigOrDefault(configPath)
     }
     private val pluginsDir =
         java.nio.file.Path
@@ -448,81 +436,54 @@ class PluginRemoveCommand : CliktCommand(name = "plugin remove") {
 }
 
 class DoctorCommand : CliktCommand(name = "doctor") {
-    private val url by option("--url", help = "Gateway base URL").default("http://127.0.0.1:8765")
-    private val password by option("--password", help = "Admin password (plaintext)")
+    private val jsonOutput by option("--json", help = "Output results as JSON").flag()
+    private val verbose by option("--verbose", help = "Include recent events dump").flag()
 
     override fun run() {
-        val statusUrl = "$url/api/status"
-        try {
-            val conn = URI(statusUrl).toURL().openConnection() as HttpURLConnection
-            conn.requestMethod = "GET"
-            conn.connectTimeout = 3_000
-            conn.readTimeout = 5_000
-            if (password != null) {
-                val token = Base64.getEncoder().encodeToString("admin:$password".toByteArray())
-                conn.setRequestProperty("Authorization", "Basic $token")
-            }
-            conn.connect()
-            val responseCode = conn.responseCode
-            if (responseCode == 200) {
-                val body = conn.inputStream.bufferedReader().readText()
-                displayStatus(body)
-            } else if (responseCode == 401) {
-                echo("Error: authentication failed — use --password to supply the admin password")
-            } else {
-                echo("Error: gateway returned HTTP $responseCode")
-            }
-            conn.disconnect()
-        } catch (e: Exception) {
-            echo("Error: could not reach gateway at $statusUrl — is it running? (${e.message})")
-        }
-    }
+        val workspaceRoot = Path.of(System.getProperty("user.home"), ".hebe")
+        val configPath = workspaceRoot.resolve("config.toml")
 
-    private fun displayStatus(json: String) {
-        // Simple display — parse manually to avoid adding a JSON library dep
-        echo("=== Hebe Gateway Status ===")
-        if ("uptimeMs" in json) {
-            val ms =
-                json
-                    .substringAfter("\"uptimeMs\":")
-                    .substringBefore(",")
-                    .trim()
-                    .toLongOrNull()
-            if (ms != null) echo("  Uptime:   ${formatUptime(ms)}")
-        }
-        echo("")
-        echo("  Channels:")
-        if ("\"channels\":" in json) {
-            val channelsJson = json.substringAfter("\"channels\":").substringAfter("[").substringBefore("]")
-            val entries = channelsJson.split("},{")
-            for (entry in entries) {
-                val name = entry.substringAfter("\"name\":\"").substringBefore("\"")
-                val health = entry.substringAfter("\"health\":\"").substringBefore("\"")
-                if (name.isNotEmpty()) echo("    $name: $health")
+        val config = if (Files.exists(configPath)) {
+            when (val r = ConfigLoader().load(configPath)) {
+                is ConfigResult.Ok -> r.value
+                is ConfigResult.Error -> {
+                    echo("Warning: failed to load config: ${r.diagnostics}")
+                    HebeConfig.default()
+                }
             }
-        }
-        echo("")
-        echo("  LLM:")
-        if ("\"llm\":" in json) {
-            val reachable = "\"reachable\":true" in json
-            echo("    reachable: $reachable")
-            if ("\"endpoint\":" in json) {
-                val endpoint = json.substringAfter("\"endpoint\":\"").substringBefore("\"")
-                echo("    endpoint:  $endpoint")
-            }
-        }
-    }
-
-    private fun formatUptime(ms: Long): String {
-        val s = ms / 1000
-        val m = s / 60
-        val h = m / 60
-        return if (h > 0) {
-            "${h}h ${m % 60}m"
-        } else if (m > 0) {
-            "${m}m ${s % 60}s"
         } else {
-            "${s}s"
+            HebeConfig.default()
+        }
+
+        val secretStore = OsKeychainSecretStore.create(workspaceRoot)
+        val logbackObserver = LogbackObserver()
+        val observer = OtelBootstrap.createObserver(logbackObserver)
+
+        val results = kotlinx.coroutines.runBlocking {
+            com.hebe.cli.doctor.runAllChecks(
+                config = config,
+                secretStore = secretStore,
+                workspaceRoot = workspaceRoot,
+                observer = observer,
+            )
+        }
+
+        if (jsonOutput) {
+            echo(com.hebe.cli.doctor.renderCheckJson(results))
+        } else {
+            echo(com.hebe.cli.doctor.renderCheckTable(results))
+            if (verbose) {
+                val events = logbackObserver.recentEvents(50)
+                if (events.isNotEmpty()) {
+                    echo("")
+                    echo("--- Recent Events (last 50) ---")
+                    events.forEach { echo(it.toString()) }
+                }
+            }
+        }
+
+        if (com.hebe.cli.doctor.hasAnyFailure(results)) {
+            throw com.github.ajalt.clikt.core.Abort()
         }
     }
 }
@@ -595,6 +556,20 @@ class ServiceUninstallCommand : CliktCommand(name = "service uninstall") {
     }
 }
 
+class ServiceStatusCommand : CliktCommand(name = "service status") {
+    override fun run() {
+        val dataDir = Path.of(System.getProperty("user.home"), ".hebe")
+        val status = com.hebe.cli.service.platformService(dataDir).status()
+        val (label, desc) =
+            when (status) {
+                is com.hebe.cli.service.ServiceStatus.Running -> "running" to "Hebe service is running"
+                is com.hebe.cli.service.ServiceStatus.Stopped -> "stopped" to "Hebe service is stopped"
+                is com.hebe.cli.service.ServiceStatus.NotInstalled -> "not-installed" to "Hebe service is not installed"
+            }
+        echo("$label: $desc")
+    }
+}
+
 class StatusCommand : CliktCommand(name = "status") {
     private val url by option("--url", help = "Gateway base URL").default("http://127.0.0.1:8765")
     private val password by option("--password", help = "Admin password (plaintext)")
@@ -626,7 +601,8 @@ class StatusCommand : CliktCommand(name = "status") {
             }
             conn.connect()
             if (conn.responseCode == 200) {
-                echo(conn.inputStream.bufferedReader().readText())
+                val json = conn.inputStream.bufferedReader().readText()
+                printStatusTable(json)
             } else {
                 echo("HTTP ${conn.responseCode}")
             }
@@ -653,6 +629,21 @@ class StatusCommand : CliktCommand(name = "status") {
             }
             conn.disconnect()
         } catch (_: Exception) {
+        }
+    }
+
+    private fun printStatusTable(json: String) {
+        try {
+            val doc = Json.parseToJsonElement(json)
+            val obj: JsonObject = doc.jsonObject
+            echo("")
+            echo("%-24s %s".format("Property", "Value"))
+            echo("%-24s %s".format("--------", "-----"))
+            obj.forEach { (key, value) ->
+                echo("%-24s %s".format(key, value.toString().removeSurrounding("\"")))
+            }
+        } catch (_: Exception) {
+            echo(json)
         }
     }
 }
@@ -740,13 +731,28 @@ private fun buildCompletionScript(shell: String): String {
             }
             _hebe
             """.trimIndent()
-        "fish" -> SUBCOMMANDS.joinToString("\n") { "complete -c hebe -f -a '$it'" }
+        "fish" -> {
+            val topLevel = SUBCOMMANDS.map { it.split(" ").first() }.distinct()
+            val notSeen = "not __fish_seen_subcommand_from ${topLevel.joinToString(" ")}"
+            val topLines = topLevel.joinToString("\n") { "complete -c hebe -f -n '$notSeen' -a $it" }
+            val subLines = SUBCOMMANDS
+                .filter { " " in it }
+                .joinToString("\n") { sub ->
+                    val parts = sub.split(" ", limit = 2)
+                    "complete -c hebe -f -n '__fish_seen_subcommand_from ${parts[0]}' -a ${parts[1]}"
+                }
+            "$topLines\n$subLines"
+        }
         else -> ""
     }
 }
 
 class OnboardCommand : CliktCommand(name = "onboard") {
     private val force by option("--force", help = "Re-run even if already configured").flag()
+    private val nonInteractive by option(
+        "--non-interactive",
+        help = "Read configuration from environment variables: HEBE_LLM_BASE_URL, HEBE_API_KEY, HEBE_ADMIN_PASSWORD, HEBE_DEFAULT_MODEL, HEBE_TELEGRAM_TOKEN, HEBE_OPERATOR_ID",
+    ).flag()
 
     @Suppress("LongMethod", "ComplexMethod")
     override fun run() {
@@ -763,57 +769,81 @@ class OnboardCommand : CliktCommand(name = "onboard") {
             return
         }
 
-        echo("=== Hebe Onboarding Wizard ===")
-        echo("")
+        val llmBaseUrl: String
+        val apiKey: String
+        val defaultModel: String
+        val adminPassword: String
+        val enableTelegram: Boolean
+        val botToken: String
+        val operatorId: Long
 
-        // Step 1: LLM endpoint
-        var llmBaseUrl: String
-        var apiKey: String
-        while (true) {
-            llmBaseUrl = ask("LLM base URL", "https://api.openai.com/v1")
-            apiKey = askSecret("API key")
-            echo("Validating LLM endpoint...")
-            if (com.hebe.cli.onboard
-                    .validateLlmEndpoint(llmBaseUrl, apiKey)
-            ) {
-                echo("OK")
-                break
-            }
-            echo("Warning: endpoint did not respond with 200. Continue anyway? [y/N]")
-            if (readLine()?.trim()?.lowercase() != "y") continue
-            break
-        }
+        if (nonInteractive) {
+            llmBaseUrl = System.getenv("HEBE_LLM_BASE_URL") ?: run { echo("Error: HEBE_LLM_BASE_URL not set"); return }
+            apiKey = System.getenv("HEBE_API_KEY") ?: run { echo("Error: HEBE_API_KEY not set"); return }
+            adminPassword = System.getenv("HEBE_ADMIN_PASSWORD") ?: run { echo("Error: HEBE_ADMIN_PASSWORD not set"); return }
+            defaultModel = System.getenv("HEBE_DEFAULT_MODEL") ?: "gpt-4o-mini"
+            val tgToken = System.getenv("HEBE_TELEGRAM_TOKEN") ?: ""
+            botToken = tgToken
+            enableTelegram = tgToken.isNotEmpty()
+            operatorId = System.getenv("HEBE_OPERATOR_ID")?.toLongOrNull() ?: 0L
+        } else {
+            echo("=== Hebe Onboarding Wizard ===")
+            echo("")
 
-        // Step 2: Default model
-        val defaultModel = ask("Default model", "gpt-4o-mini")
-
-        // Step 3: Admin password
-        val adminPassword = askSecret("Web admin password")
-        val confirmPassword = askSecret("Confirm admin password")
-        if (adminPassword != confirmPassword) {
-            echo("Passwords do not match. Aborting.")
-            return
-        }
-
-        // Step 4: Telegram (optional)
-        echo("Enable Telegram channel? [y/N]")
-        val enableTelegram = readLine()?.trim()?.lowercase() == "y"
-        var botToken = ""
-        var operatorId = 0L
-        if (enableTelegram) {
+            // Step 1: LLM endpoint
+            var tmpUrl = ""
+            var tmpKey = ""
             while (true) {
-                botToken = askSecret("Telegram bot token")
-                echo("Validating bot token...")
+                tmpUrl = ask("LLM base URL", "https://api.openai.com/v1")
+                tmpKey = askSecret("API key")
+                echo("Validating LLM endpoint...")
                 if (com.hebe.cli.onboard
-                        .validateTelegramToken(botToken)
+                        .validateLlmEndpoint(tmpUrl, tmpKey)
                 ) {
                     echo("OK")
                     break
                 }
-                echo("Invalid token. Retry? [y/N]")
-                if (readLine()?.trim()?.lowercase() != "y") break
+                echo("Warning: endpoint did not respond with 200. Continue anyway? [y/N]")
+                if (readLine()?.trim()?.lowercase() != "y") continue
+                break
             }
-            operatorId = ask("Your Telegram user ID (numeric)", "0").trim().toLongOrNull() ?: 0L
+            llmBaseUrl = tmpUrl
+            apiKey = tmpKey
+
+            // Step 2: Default model
+            defaultModel = ask("Default model", "gpt-4o-mini")
+
+            // Step 3: Admin password
+            adminPassword = askSecret("Web admin password")
+            val confirmPassword = askSecret("Confirm admin password")
+            if (adminPassword != confirmPassword) {
+                echo("Passwords do not match. Aborting.")
+                return
+            }
+
+            // Step 4: Telegram (optional)
+            echo("Enable Telegram channel? [y/N]")
+            val tgEnabled = readLine()?.trim()?.lowercase() == "y"
+            var tmpToken = ""
+            var tmpOperatorId = 0L
+            if (tgEnabled) {
+                while (true) {
+                    tmpToken = askSecret("Telegram bot token")
+                    echo("Validating bot token...")
+                    if (com.hebe.cli.onboard
+                            .validateTelegramToken(tmpToken)
+                    ) {
+                        echo("OK")
+                        break
+                    }
+                    echo("Invalid token. Retry? [y/N]")
+                    if (readLine()?.trim()?.lowercase() != "y") break
+                }
+                tmpOperatorId = ask("Your Telegram user ID (numeric)", "0").trim().toLongOrNull() ?: 0L
+            }
+            enableTelegram = tgEnabled
+            botToken = tmpToken
+            operatorId = tmpOperatorId
         }
 
         val answers =
@@ -839,7 +869,7 @@ class OnboardCommand : CliktCommand(name = "onboard") {
         val secretStore = OsKeychainSecretStore.create(dataDir)
         runBlocking {
             secretStore.set("llm.api_key", apiKey.toByteArray())
-            secretStore.set("web.password", adminPassword.toByteArray())
+            secretStore.set("web.password", MessageDigest.getInstance("SHA-256").digest(adminPassword.toByteArray()))
             if (enableTelegram && botToken.isNotEmpty()) {
                 secretStore.set("telegram.bot_token", botToken.toByteArray())
             }

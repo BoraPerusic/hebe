@@ -46,7 +46,7 @@ class SqliteMemoryStore(
     }
 
     private val indexer = Indexer(db, embeddings)
-    private val searcher = Searcher(db, embeddings)
+    private val searcher = Searcher(db, embeddings, observer)
     private val systemPromptAssembler = SystemPromptAssembler(workspaceFs)
     private val mutex = Mutex()
 
